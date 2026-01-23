@@ -32,51 +32,68 @@
             </div>
 
             <nav class="sidebar-menu">
-                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')" data-roles="ADMINISTRADOR,SECRETARIA"></a>>
-                    <i class="material-icons">receipt</i> Nuevo Recibo
-                </a>
+    
+    <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')" data-roles="SECRETARIA,ADMINISTRADOR">
+        <i class="material-icons">receipt</i> Nuevo Recibo
+    </a>
 
-                <div class="menu-dropdown" data-roles="PADRE DE FAMILIA,ADMINISTRADOR">
-                    <button class="dropdown-btn">
-                        <span><i class="material-icons">monetization_on</i> Pagos</span>
-                        <i class="material-icons arrow">expand_more</i>
-                    </button>
-                    <div class="dropdown-content">
-                        <a href="#" onclick="loadView('conceptos')">Conceptos</a>
-                        <a href="#" onclick="loadView('descuentos')">Descuentos</a>
-                        <a href="#" onclick="loadView('recibos')">Recibos</a>
-                        <a href="#" onclick="loadView('historial-pagos')">Historial</a>
-                        <a href="#" onclick="loadView('caja')">Caja</a>
-                    </div>
-                </div>
+    <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+        <button class="dropdown-btn">
+            <span><i class="material-icons">monetization_on</i> Pagos</span>
+            <i class="material-icons arrow">expand_more</i>
+        </button>
+        <div class="dropdown-content">
+            <a href="#" onclick="loadView('conceptos')">Conceptos</a>
+            <a href="#" onclick="loadView('descuentos')">Descuentos</a>
+            <a href="#" onclick="loadView('recibos')">Recibos</a>
+            <a href="#" onclick="loadView('historial-pagos')">Historial de pagos</a>
+            <a href="#" onclick="loadView('egresos')">Egresos</a>
+            <a href="#" onclick="loadView('caja')">Caja</a>
+        </div>
+    </div>
 
-                <div class="menu-dropdown" data-roles="ADMINISTRADOR,DIRECTIVO,SECRETARIA">
-                    <button class="dropdown-btn">
-                        <span><i class="material-icons">school</i> Matrículas</span>
-                        <i class="material-icons arrow">expand_more</i>
-                    </button>
-                    <div class="dropdown-content">
-                        <a href="#" onclick="loadView('nueva-matricula')">Nueva Matrícula</a>
-                        <a href="#" onclick="loadView('matricula-masiva')">Matrícula Masiva</a>
-                        <a href="#" onclick="loadView('secciones')">Secciones</a>
-                    </div>
-                </div>
+    <div class="menu-dropdown" data-roles="ADMINISTRADOR,DIRECTIVO,SECRETARIA">
+        <button class="dropdown-btn">
+            <span><i class="material-icons">school</i> Matrículas</span>
+            <i class="material-icons arrow">expand_more</i>
+        </button>
+        <div class="dropdown-content">
+            <a href="#" onclick="loadView('nueva-matricula')">Nueva Matrícula</a>
+            <a href="#" onclick="loadView('matricula-masiva')">Matrícula Masiva</a>
+            <a href="#" onclick="loadView('secciones')">Secciones</a>
+            <a href="#" onclick="loadView('traslados')">Traslados</a>
+        </div>
+    </div>
 
-                <div class="menu-dropdown" data-roles="ADMINISTRADOR">
-                    <button class="dropdown-btn">
-                        <span><i class="material-icons">settings</i> Configuración</span>
-                        <i class="material-icons arrow">expand_more</i>
-                    </button>
-                    <div class="dropdown-content">
-                        <a href="#" onclick="loadView('usuarios')">Usuarios</a>
-                        <a href="#" onclick="loadView('anio-academico')">Año Académico</a>
-                    </div>
-                </div>
+    <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+        <button class="dropdown-btn">
+            <span><i class="material-icons">group</i> Registros</span>
+            <i class="material-icons arrow">expand_more</i>
+        </button>
+        <div class="dropdown-content">
+            <a href="#" onclick="loadView('nuevo-estudiante')">Nuevo Estudiante</a>
+            <a href="#" onclick="loadView('nuevo-responsable')">Nuevo Responsable</a>
+            <a href="#" onclick="loadView('ver-estudiantes')">Ver Estudiantes</a>
+            <a href="#" onclick="loadView('ver-responsables')">Ver Responsables</a>
+        </div>
+    </div>
 
-                <a href="#" class="menu-item logout" onclick="logout()">
-                    <i class="material-icons">exit_to_app</i> Cerrar Sesión
-                </a>
-            </nav>
+    <div class="menu-dropdown" data-roles="ADMINISTRADOR">
+        <button class="dropdown-btn">
+            <span><i class="material-icons">settings</i> Configuración</span>
+            <i class="material-icons arrow">expand_more</i>
+        </button>
+        <div class="dropdown-content">
+            <a href="#" onclick="loadView('anio-academico')">Año Académico</a>
+            <a href="#" onclick="loadView('config-secciones')">Conf. Secciones</a>
+            <a href="#" onclick="loadView('usuarios')">Usuarios</a>
+        </div>
+    </div>
+
+    <a href="#" class="menu-item logout" onclick="logout()">
+        <i class="material-icons">exit_to_app</i> Cerrar Sesión
+    </a>
+</nav>
         </aside>
 
         <main class="main-content">
@@ -98,4 +115,5 @@
     <script src="script.js"></script>
 </body>
 </html>
+
 
