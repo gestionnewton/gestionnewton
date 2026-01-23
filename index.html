@@ -3,51 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - I.E.P. Sir Isaac Newton</title>
-    <link rel="icon" href="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png">
-    
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/gestionnewton/gestionnewton/css/styles.css">
+    <title>Intranet - Ciencias Aplicadas Sir Isaac Newton</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
 
-    <div class="login-wrapper">
+    <div id="login-container" class="login-wrapper">
         <div class="login-card">
-            <div class="login-header">
-                <div class="logo-container">
-                    <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Insignia Newton">
-                </div>
-                <h2>Bienvenido</h2>
-                <p>I.E.P. Ciencias Aplicadas Sir Isaac Newton</p>
-            </div>
-
-            <form id="loginForm">
-                <div class="input-group">
-                    <i class='bx bxs-user'></i>
-                    <input type="text" id="username" placeholder="Usuario / DNI" required autocomplete="off">
-                </div>
-
-                <div class="input-group">
-                    <i class='bx bxs-lock-alt'></i>
-                    <input type="password" id="password" placeholder="Contraseña" required>
-                </div>
-
-                <button type="submit" id="btnLogin">
-                    <span id="btnText">INICIAR SESIÓN</span>
-                    <div id="loader" class="loader hidden"></div>
-                </button>
+            <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Logo Newton" class="logo-login">
+            <h2>Bienvenido</h2>
+            <p>Ciencias Aplicadas Sir Isaac Newton</p>
+            <form id="login-form">
+                <input type="text" id="user" placeholder="Usuario" required>
+                <input type="password" id="pass" placeholder="Contraseña" required>
+                <button type="submit" class="btn-primary">Ingresar</button>
             </form>
-
-            <div class="login-footer">
-                <p>&copy; 2026 Gestión Escolar</p>
-            </div>
-            
-            <div id="messageArea" class="message hidden"></div>
+            <p id="login-msg" class="msg-error"></p>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/gh/TU_USUARIO/TU_REPO/js/main.js"></script>
+    <div id="app-container" class="app-layout" style="display: none;">
+        
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Logo Pequeño">
+                <span>Newton App</span>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')">
+                    <i class="material-icons">receipt</i> Nuevo Recibo
+                </a>
+
+                <div class="menu-dropdown">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">monetization_on</i> Pagos</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('conceptos')">Conceptos</a>
+                        <a href="#" onclick="loadView('descuentos')">Descuentos</a>
+                        <a href="#" onclick="loadView('recibos')">Recibos</a>
+                        <a href="#" onclick="loadView('historial-pagos')">Historial</a>
+                        <a href="#" onclick="loadView('caja')">Caja</a>
+                    </div>
+                </div>
+
+                <div class="menu-dropdown">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">school</i> Matrículas</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('nueva-matricula')">Nueva Matrícula</a>
+                        <a href="#" onclick="loadView('matricula-masiva')">Matrícula Masiva</a>
+                        <a href="#" onclick="loadView('secciones')">Secciones</a>
+                    </div>
+                </div>
+
+                <div class="menu-dropdown">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">settings</i> Configuración</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('usuarios')">Usuarios</a>
+                        <a href="#" onclick="loadView('anio-academico')">Año Académico</a>
+                    </div>
+                </div>
+
+                <a href="#" class="menu-item logout" onclick="logout()">
+                    <i class="material-icons">exit_to_app</i> Cerrar Sesión
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="page-title">Panel de Control</h2>
+                <div class="user-info">
+                    <span id="user-display-name">Usuario</span>
+                    <span id="user-role-badge" class="badge">ROL</span>
+                </div>
+            </header>
+            
+            <div id="content-area" class="content-wrapper">
+                <h3>Seleccione una opción del menú</h3>
+                <button onclick="testConnection()">Probar Conexión con Servidor</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
