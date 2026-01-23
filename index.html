@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - I.E.P. Sir Isaac Newton</title>
+    <link rel="icon" href="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/gestionnewton/gestionnewton/css/styles.css">
+</head>
+<body>
+
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-container">
+                    <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Insignia Newton">
+                </div>
+                <h2>Bienvenido</h2>
+                <p>I.E.P. Ciencias Aplicadas Sir Isaac Newton</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="input-group">
+                    <i class='bx bxs-user'></i>
+                    <input type="text" id="username" placeholder="Usuario / DNI" required autocomplete="off">
+                </div>
+
+                <div class="input-group">
+                    <i class='bx bxs-lock-alt'></i>
+                    <input type="password" id="password" placeholder="Contraseña" required>
+                </div>
+
+                <button type="submit" id="btnLogin">
+                    <span id="btnText">INICIAR SESIÓN</span>
+                    <div id="loader" class="loader hidden"></div>
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>&copy; 2026 Gestión Escolar</p>
+            </div>
+            
+            <div id="messageArea" class="message hidden"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/gh/TU_USUARIO/TU_REPO/js/main.js"></script>
+</body>
+</html>
