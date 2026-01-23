@@ -47,22 +47,28 @@ function inicializarApp() {
     filtrarMenuPorRol(currentUser.role);
 }
 
-// 4. FUNCIÓN PARA FILTRAR MENÚ POR ROLES (NUEVO)
+// 4. FUNCIÓN PARA FILTRAR MENÚ POR ROLES (MEJORADA)
 function filtrarMenuPorRol(userRole) {
-    // Seleccionamos tanto items simples como menús desplegables
     const menuItems = document.querySelectorAll('.sidebar-menu > .menu-item, .sidebar-menu > .menu-dropdown');
     
-    menuItems.forEach(item => {
-        const allowedRoles = item.getAttribute('data-roles');
-        
-        // Si el item no tiene restricción de roles, lo dejamos visible (o puedes ocultarlo por defecto)
-        if (!allowedRoles) return; 
+    // Normalizamos el rol del usuario (todo mayúsculas, sin espacios extra)
+    const roleNormalized = userRole.trim().toUpperCase();
+    console.log("Rol detectado (Normalizado):", roleNormalized); // Para depurar en consola
 
-        // Si el rol del usuario está en la lista permitida, se muestra. Si no, se oculta.
-        if (allowedRoles.includes(userRole)) {
-            item.style.display = 'block'; // O 'flex' si usas flexbox en el item
+    menuItems.forEach(item => {
+        const attr = item.getAttribute('data-roles');
+        
+        // Si no tiene restricciones, se muestra
+        if (!attr) return; 
+
+        // Convertimos la lista de roles permitidos a un array limpio en mayúsculas
+        const allowedRoles = attr.split(',').map(r => r.trim().toUpperCase());
+
+        // Verificamos
+        if (allowedRoles.includes(roleNormalized)) {
+            item.style.display = 'flex'; // Usamos flex para mantener el alineado del icono
         } else {
-            item.style.display = 'none';
+            item.style.display = 'none'; // Ocultamos
         }
     });
 }
@@ -119,3 +125,4 @@ function testConnection() {
     // Esta función es útil para depurar, la puedes dejar o borrar si ya probaste que funciona
     sendRequest('test_connection').then(res => alert(res.message));
 }
+
