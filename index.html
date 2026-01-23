@@ -32,11 +32,12 @@
             </div>
 
             <nav class="sidebar-menu">
-                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')">
+                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')"
+                data-roles="PADRE DE FAMILIA"></a>>
                     <i class="material-icons">receipt</i> Nuevo Recibo
                 </a>
 
-                <div class="menu-dropdown">
+                <div class="menu-dropdown" data-roles="PADRE DE FAMILIA,ADMINISTRADOR">
                     <button class="dropdown-btn">
                         <span><i class="material-icons">monetization_on</i> Pagos</span>
                         <i class="material-icons arrow">expand_more</i>
@@ -50,7 +51,7 @@
                     </div>
                 </div>
 
-                <div class="menu-dropdown">
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,DIRECTIVO,SECRETARIA">
                     <button class="dropdown-btn">
                         <span><i class="material-icons">school</i> Matrículas</span>
                         <i class="material-icons arrow">expand_more</i>
@@ -62,7 +63,7 @@
                     </div>
                 </div>
 
-                <div class="menu-dropdown">
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR">
                     <button class="dropdown-btn">
                         <span><i class="material-icons">settings</i> Configuración</span>
                         <i class="material-icons arrow">expand_more</i>
