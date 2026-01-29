@@ -5370,7 +5370,7 @@ function renderDashboardView() {
                         </div>
                     </div>
                     <div class="dash-card" style="border-left: 6px solid #06b6d4;">
-                        <i class="material-icons" style="font-size:40px; color:#06b6d4">child_care</i>
+                        <i class="material-icons" style="font-size:40px; color:#06b6d4">local_library</i>
                         <div>
                             <span class="stat-label">NIVEL PRIMARIA</span>
                             <div id="dash-primaria" class="stat-value">${d.primaria}</div>
@@ -6193,3 +6193,4 @@ async function enviarSolicitudAcceso(idRecibido) {
         btn.innerHTML = originalText;
     }
 }
+
