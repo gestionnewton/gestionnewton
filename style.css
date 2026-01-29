@@ -1,69 +1,1450 @@
+/* 1. FUENTES Y VARIABLES */
+/* Importamos Anek Devanagari con todos sus pesos */
+@import url('https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&display=swap');
+
 :root {
-    --primary-blue: #0d47a1;     /* Azul oscuro institucional */
-    --light-blue: #42a5f5;       /* Celeste vibrante */
-    --bg-light: #f4f7fa;         /* Fondo gris azulado muy claro */
+    /* Paleta de Azules Modernos */
+    --primary-blue: #2563eb;       /* Un azul más brillante y digital (Royal Blue) */
+    --primary-dark: #1e40af;       /* Azul profundo para hovers */
+    --light-blue: #bfdbfe;         /* Celeste muy suave para fondos activos */
+    --accent-cyan: #06b6d4;        /* Turquesa para detalles */
+    --sidebar-dark: hsl(225, 74%, 30%); /* El color que solicitaste */
+    --sidebar-text-light: rgba(255, 255, 255, 0.9);
+    --sidebar-icon-light: rgba(255, 255, 255, 0.5);
+    
+    /* Neutros Minimalistas */
+    --bg-body: #f3f4f6;            /* Gris muy claro, casi blanco */
     --white: #ffffff;
-    --text-dark: #333333;
-    --sidebar-width: 260px;
+    --text-main: #1f2937;          /* Gris oscuro (no negro puro) para mejor lectura */
+    --text-muted: #6b7280;         /* Gris medio para textos secundarios */
+    
+    /* Dimensiones y Efectos */
+    --sidebar-width: 270px;
+    --radius-lg: 16px;             /* Bordes muy redondeados */
+    --radius-sm: 8px;              /* Bordes ligeramente redondeados */
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05); /* Sombra "flotante" */
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+    /* Variables de Estilo Google-like */
+    --font-main: 'Anek Devanagari', sans-serif;
+    --radius-lg: 18px; /* Un poco más de radio para acompañar el tamaño de letra */
+    --radius-sm: 12px;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+* {box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: var(--font-main);}
 
-body { background-color: var(--bg-light); color: var(--text-dark); height: 100vh; overflow: hidden; }
+body { 
+    background-color: var(--bg-body); 
+    color: var(--text-main); 
+    height: 100vh; 
+    overflow: hidden; 
+    font-size: 18px; /* Aumentado de 14px a 18px para máxima legibilidad */
+    line-height: 1.5; /* Mejora el espacio entre líneas */
+}
 
-/* Login Styles */
+/* 2. LOGIN (Actualizado) */
+/* --- AJUSTES DE LOGO LOGIN --- */
+.logo-login { 
+    width: 100%;
+    max-width: 120px; /* Tamaño controlado para que no desborde */
+    height: auto;
+    margin-bottom: 0.5rem;
+    object-fit: contain;
+}
+
 .login-wrapper {
     display: flex; justify-content: center; align-items: center; height: 100vh;
-    background: linear-gradient(135deg, var(--primary-blue), var(--light-blue));
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); /* Degradado sutil */
 }
 .login-card {
-    background: var(--white); padding: 2rem; border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; width: 350px;
+    background: var(--white); padding: 3rem; border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(37, 99, 235, 0.1); /* Sombra azulada */
+    text-align: center; width: 380px; border: 1px solid rgba(255,255,255,0.8);
 }
-.logo-login { width: 100px; margin-bottom: 1rem; }
+.login-card h2 { color: var(--primary-blue); font-weight: 700; margin-bottom: 5px; }
+.login-card p { color: var(--text-muted); margin-bottom: 20px; }
 .login-card input {
-    width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;
+    width: 100%; padding: 14px; margin: 8px 0; font-size: 1em; height: 42px !important; border-radius: 12px !important;
+    padding: 0 15px !important; margin-bottom: 15px !important; border: 1px solid #e5e7eb; 
+    background-color: #f9fafb; transition: all 0.3s;
 }
-.btn-primary {
-    width: 100%; padding: 10px; background-color: var(--primary-blue); color: var(--white);
-    border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+.login-card input:focus {
+    outline: none; border-color: var(--primary-blue); background-color: var(--white);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
-.btn-primary:hover { background-color: #002171; }
 
-/* Layout App */
+.login-card .btn-primary {
+    height: 42px !important; /* Altura reducida */
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important; /* Suavidad para la animación */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+/* EFECTO DE HUNDIMIENTO (AL HACER CLIC) */
+.login-card .btn-primary:active {
+    transform: scale(0.95); /* Se encoge un 5% */
+}
+
+/* Clase para la rueda de carga (reutilizando la de guardado) */
+.rotate {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes rotation {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(359deg); }
+}
+
+
+/* Botones Modernos */
+.btn-primary {
+    width: 100%; padding: 14px 24px; 
+    background-color: var(--primary-blue); color: var(--white);
+    border: none; border-radius: var(--radius-sm); 
+    cursor: pointer; font-weight: 500; font-size: 1.2rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover { 
+    background-color: var(--primary-dark); 
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+/* 3. LAYOUT PRINCIPAL */
 .app-layout { display: flex; height: 100vh; }
 
-/* Sidebar */
+/* Sidebar Minimalista */
 .sidebar {
-    width: var(--sidebar-width); background-color: var(--primary-blue); color: var(--white);
-    display: flex; flex-direction: column;
+    width: var(--sidebar-width); 
+    background-color: var(--white); 
+    display: flex; 
+    flex-direction: column;
+    border-right: 1px solid #e5e7eb;
 }
+/* El encabezado se queda blanco como pediste */
 .sidebar-header {
-    padding: 20px; display: flex; align-items: center; gap: 10px; background-color: rgba(0,0,0,0.1);
+    padding: 25px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    background-color: var(--white);
 }
-.sidebar-header img { width: 40px; }
-.sidebar-menu { padding: 20px 0; flex: 1; overflow-y: auto; }
 
+.header-logo-group {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Espacio equilibrado entre logo y texto */
+    padding-right: 10px; /* Margen de seguridad a la derecha */
+}
+
+/* Control del tamaño del logo para que no se deforme */
+.header-logo-group img {
+    width: 42px; /* Tamaño fijo para consistencia */
+    height: auto;
+    object-fit: contain;
+}
+
+.brand-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 0.7; /* Mantiene el título y subtítulo pegaditos */
+}
+
+.brand-title {
+    font-family: 'Anek Devanagari', sans-serif;
+    font-weight: 600; /* Extra negrita para impacto */
+    font-size: 1.5rem; /* Tamaño base */
+    color: var(--sidebar-dark); /* Azul oscuro corporativo */
+    letter-spacing: -0.5px; /* Las letras un poco juntas se ven más modernas en títulos */
+    text-transform: uppercase;
+}
+
+.brand-subtitle {
+    font-family: 'Anek Devanagari', sans-serif;
+    font-size: 0.65rem; /* Tamaño PEQUEÑO como pediste */
+    font-weight: 700;
+    color: #64748b; /* Gris azulado (slate) para que no compita con el título */
+    text-transform: uppercase;
+    letter-spacing: 2px; /* TRUCO PRO: Espaciar las letras pequeñas da elegancia */
+    margin-top: 3px;
+    white-space: nowrap; /* Evita que el texto se parta en dos líneas */
+}
+
+.sidebar-header img { width: 48px; }
+
+/* El Menú ahora lleva el color oscuro */
+.sidebar-menu { 
+    padding: 12px; 
+    flex: 1; 
+    overflow-y: auto; 
+    background-color: var(--sidebar-dark); /* Color H225 S74 L30 */
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    border-radius: 0 !important; /* Esquinas rectas */
+    margin: 0 !important;        /* Ocupa todo el ancho disponible */
+    border-top: 1px solid rgba(255,255,255,0.1); /* Opcional: línea sutil separadora */
+}
+
+/* --- TÍTULO DE SECCIÓN AGRANDADO --- */
+.top-bar h2 { 
+    font-size: 1.8rem; /* Más grande y prominente */
+    font-weight: 700; 
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+}
+
+
+/* Items del Menú */
+/* Items del Menú: Texto e Iconos claros */
 .menu-item, .dropdown-btn {
-    padding: 15px 20px; display: flex; align-items: center; gap: 10px;
-    color: rgba(255,255,255,0.8); text-decoration: none; border: none;
-    background: none; width: 100%; text-align: left; font-size: 1rem; cursor: pointer;
+    display: flex; 
+    align-items: center; 
+    gap: 12px;
+    color: var(--sidebar-text-light); /* Texto casi blanco */
+    text-decoration: none; 
+    border: none;
+    background: none; 
+    width: 100%; 
+    text-align: left; 
+    border-radius: var(--radius-sm); 
+    cursor: pointer; 
+    transition: all 0.2s;
+    letter-spacing: 0.2px;
+    padding: 14px 18px; /* Aumentamos el padding para mayor área de clic */
+    font-size: 1.05rem; /* Letra clara en el menú */
+    font-weight: 500;
 }
-.menu-item:hover, .dropdown-btn:hover { background-color: rgba(255,255,255,0.1); color: var(--white); }
+.menu-item i, .dropdown-btn i { 
+    font-size: 1.2rem; 
+    color: var(--sidebar-icon-light); /* Iconos suavizados */
+}
 
-/* Dropdown Logic */
-.dropdown-content { display: none; background-color: rgba(0,0,0,0.2); }
+/* Efecto de Resaltado (Hover) en fondo oscuro */
+.menu-item:hover, .dropdown-btn:hover { 
+    background-color: rgba(255, 255, 255, 0.1); /* Brillo sutil */
+    color: var(--white); 
+}
+
+.menu-item:hover i, .dropdown-btn:hover i { 
+    color: var(--white); 
+}
+
+/* Dropdowns */
+.menu-dropdown { display: flex; flex-direction: column; width: 100%; margin-bottom: 2px; }
+.dropdown-content { 
+    display: none; padding-left: 10px;
+    /* Sin fondo gris, solo sangría para limpieza */
+}
+.show { display: block; animation: slideDown 0.2s ease; }
+
 .dropdown-content a {
-    display: block; padding: 12px 20px 12px 50px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;
+    display: block; 
+    padding: 12px 12px 12px 48px; 
+    color: rgba(255, 255, 255, 0.7); /* Texto secundario claro */
+    text-decoration: none; 
+    font-size: 1rem;
+    border-radius: var(--radius-sm);
+    position: relative;
 }
-.dropdown-content a:hover { color: var(--white); background-color: rgba(255,255,255,0.05); }
-.show { display: block; } /* Clase para JS */
 
-/* Main Content */
-.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.top-bar {
-    height: 60px; background-color: var(--white); border-bottom: 1px solid #ddd;
-    display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
+/* Punto guía del submenú */
+.dropdown-content a::before {
+    content: ''; 
+    position: absolute; 
+    left: 25px; 
+    top: 50%; 
+    transform: translateY(-50%);
+    width: 4px; 
+    height: 4px; 
+    border-radius: 50%; 
+    background-color: rgba(255, 255, 255, 0.3);
 }
-.content-wrapper { padding: 20px; overflow-y: auto; height: 100%; }
-.badge { background-color: var(--light-blue); color: var(--white); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 5px; }
+
+.dropdown-content a:hover { 
+    color: var(--white); 
+    background-color: rgba(255, 255, 255, 0.05); 
+}
+
+.dropdown-content a:hover::before { 
+    background-color: var(--light-blue); 
+}
+
+/* 4. CONTENIDO PRINCIPAL */
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background-color: var(--bg-body); }
+
+.top-bar {
+    height: 70px; background-color: var(--white); 
+    display: flex; justify-content: space-between; align-items: center; padding: 0 30px;
+    box-shadow: var(--shadow-soft); z-index: 10;
+}
+.top-bar h2 { font-size: 1.2rem; font-weight: 600; color: var(--text-main); }
+
+.content-wrapper { padding: 30px; overflow-y: auto; height: 100%; }
+
+/* Badge de Rol */
+.badge { 
+    background-color: #eff6ff; color: var(--primary-blue); 
+    padding: 5px 12px; border-radius: 20px; 
+    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;
+    border: 1px solid #dbeafe;
+}
+
+/* 5. TABLAS MODERNAS (Redondeadas) */
+.table-container {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: 5px; /* Pequeño padding interno */
+    overflow: hidden; /* Clave para redondear la tabla */
+    border: 1px solid #e5e7eb;
+}
+
+.data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+.data-table thead tr { 
+    /* Usamos el azul H225 S74 L30 o el primary-blue para consistencia */
+    background: var(--primary-blue) !important; 
+    color: var(--white) !important;
+    text-align: left;
+}
+.data-table th {
+    padding: 20px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase; 
+    font-size: 0.9rem !important; /* Un poco más grande para legibilidad */
+    letter-spacing: 0.5px;
+    border: none !important;
+    font-family: 'Anek Devanagari', sans-serif;
+}
+/* Estilo de las celdas de datos */
+.data-table td {
+    padding: 18px 20px !important;
+    border-bottom: 1px solid #f1f5f9;
+    color: var(--text-main);
+    font-size: 1.1rem; /* Acorde al nuevo tamaño de 18px base */
+}
+/* Primer y último borde redondeado en encabezados */
+.data-table thead th:first-child { border-top-left-radius: 12px !important;}
+.data-table thead th:last-child { border-top-right-radius: 12px !important; }
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover { background-color: #f8fafc; }
+
+/* Botones de Acción en Tabla */
+.data-table button {
+    background: #eff6ff; color: var(--primary-blue);
+    padding: 6px 12px; border-radius: 6px; font-size: 0.8rem;
+    transition: all 0.2s;
+}
+.data-table button:hover { background: var(--primary-blue); color: var(--white); }
+
+
+/* 6. MODALES (Estilo Sólido y Minimalista) */
+.modal-overlay { 
+    backdrop-filter: blur(8px); /* Desenfoque del fondo */
+    background: rgba(0, 0, 0, 0.4) !important; /* Capa oscura sutil */
+    display: none; 
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    z-index: 2000; 
+    justify-content: center; 
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--white) !important; /* FONTO SÓLIDO BLANCO */
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    padding: 40px !important;
+    width: 90%;
+    max-width: 850px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: none !important;
+    position: relative;
+}
+
+/* Títulos dentro del modal */
+.modal-content h3 { 
+    font-size: 2rem !important;
+    font-weight: 800;
+    color: var(--sidebar-dark);
+    margin-bottom: 25px;
+    border-bottom: 2px solid #f3f4f6;
+    padding-bottom: 15px;
+}
+
+/* Inputs dentro del Modal */
+.modal-content input {
+    background: #f9fafb; 
+    border: 1px solid #e5e7eb !important;
+    border-radius: var(--radius-sm) !important; 
+    padding: 16px !important; /* Más alto */
+    font-size: 1.1rem !important; /* Texto de entrada más grande */
+    margin-bottom: 5px;
+}
+
+.modal-content input:focus { 
+    border-color: var(--primary-blue) !important; 
+    background: var(--white); 
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Botones de acción del Modal (Guardar y Cancelar) */
+.modal-content .btn-primary, 
+.modal-content button[type="button"] {
+    padding: 16px 30px !important;
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-sm) !important;
+    height: auto !important;
+}
+
+/* Específicamente el botón CANCELAR */
+.modal-content button[type="button"] {
+    background-color: #f3f4f6 !important;
+    color: var(--text-muted) !important;
+    border: 1px solid #e5e7eb !important;
+    transition: all 0.2s;
+}
+
+.modal-content button[type="button"]:hover {
+    background-color: #e5e7eb !important;
+    color: var(--text-main) !important;
+}
+
+
+/* 7. RESPONSIVE Y ANIMACIONES DE MENÚ */
+
+/* Estilo base para los botones de control (Hamburguesa y X) */
+.menu-btn, .close-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, opacity 0.2s; /* Suavidad para el clic */
+    padding: 5px;
+}
+
+/* EFECTO DE BOTÓN: Animación de "hundimiento" al presionar */
+.menu-btn:active, .close-btn:active {
+    transform: scale(0.85); /* Se encoge un poco al tocarlo */
+    opacity: 0.7;
+}
+
+.menu-btn { display: none; color: var(--text-main); }
+.close-btn { display: none !important; }
+
+@media (max-width: 1024px) { /* Breakpoint recomendado para tablets y celulares */
+    .menu-btn { display: block; }
+    .close-btn { display: block !important; color: var(--text-main); }
+
+    /* SIDEBAR CON DESLIZAMIENTO */
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        box-shadow: 5px 0 25px rgba(0,0,0,0.1);
+        
+        /* Estado inicial: oculto fuera de la pantalla (Izquierda) */
+        transform: translateX(-100%); 
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Deslizamiento fluido */
+    }
+
+    /* Cuando el menú está activo se desliza hacia adentro */
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* OVERLAY (Fondo oscuro) CON FADE IN */
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.4);
+        z-index: 900;
+        backdrop-filter: blur(2px);
+        
+        /* Estado inicial: invisible */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s;
+    }
+
+    /* Cuando el overlay está activo se desvanece suavemente */
+    .overlay.active {
+        display: block; /* Mantiene compatibilidad con tu JS actual */
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .content-wrapper { padding: 15px; }
+}
+
+@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+/*////////////////////////*/
+/* Animación de carga para botones */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    display: inline-block;
+    animation: spin 1s ease-in-out infinite;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Ajuste para inputs en el formulario de estudiante */
+#form-estudiante input {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-size: 1.1rem;
+    width: 100%;
+    outline: none;
+}
+#form-estudiante input:focus {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+
+
+/*///////////////////////////////////*/
+/* --- BUSCADOR DINÁMICO --- */
+.search-results-box {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+    z-index: 3000;
+    display: none;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.search-item:hover { background-color: #eff6ff; color: var(--primary-blue); }
+
+/* --- ANIMACIÓN SPINNER --- */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Botón Cancelar */
+.btn-cancel {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    border: none;
+    padding: 14px 24px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+
+
+
+/* Efecto al seleccionar */
+#search-est:focus, #search-resp:focus {
+    border-color: var(--primary-blue);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+/* Ajuste para el placeholder */
+#search-est::placeholder, #search-resp::placeholder {
+    font-size: 1.1rem;      /* Un poco más pequeño que el texto real */
+    color: #9ca3af;
+}
+
+.custom-select {
+    padding: 16px !important;
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid #e5e7eb !important;
+    font-size: 1.1rem !important;
+    background-color: #f9fafb !important;
+    font-family: var(--font-main);
+    color: var(--text-main);
+    outline: none;
+    cursor: pointer;
+}
+.custom-select:focus {
+    border-color: var(--primary-blue) !important;
+    background-color: var(--white) !important;
+}
+
+/* --- DISEÑO DE BÚSQUEDA UNIFICADO Y OVALADO --- */
+
+/* Contenedor: Controla que el grupo no crezca ni se encoja de más */
+.search-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 550px !important; /* ESTO unifica el largo de ambos */
+    margin: 0 !important;
+}
+
+/* Los inputs de búsqueda */
+#search-est, #search-resp {
+    flex: 1 !important; /* El cuadro toma todo el espacio dentro de los 550px */
+    min-width: 0 !important; /* Evita que el texto largo lo ensanche */
+    height: 50px !important;
+    border-radius: 50px !important;
+    font-size: 1.4rem !important;
+    padding: 0 25px !important;
+    border: 1px solid #d1d5db !important;
+    background: #ffffff !important;
+    outline: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+}
+
+/* El botón de limpiar */
+.btn-clear {
+    flex-shrink: 0 !important; /* IMPIDE que el cuadro de búsqueda lo aplaste */
+    height: 50px !important;
+    padding: 0 20px !important;
+    border-radius: 50px !important;
+    background-color: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    color: #4b5563 !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+.btn-clear:hover {
+    background-color: #e5e7eb !important;
+    color: var(--primary-blue) !important;
+    border-color: var(--primary-blue) !important;
+}
+
+
+/* --- BOTONES DE ACCIÓN EN TABLAS --- */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start;
+}
+
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%; /* Botón circular */
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Estilo para el botón VER */
+.btn-icon.view {
+    background-color: #f0fdf4; /* Verde muy claro */
+    color: #16a34a; /* Verde oscuro */
+}
+.btn-icon.view:hover {
+    background-color: #16a34a;
+    color: #ffffff;
+}
+
+/* Estilo para el botón EDITAR */
+.btn-icon.edit {
+    background-color: #eff6ff; /* Azul muy claro */
+    color: #2563eb; /* Azul corporativo */
+}
+.btn-icon.edit:hover {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+/* Ajuste de los íconos dentro de los botones */
+.btn-icon i {
+    font-size: 1.2rem;
+}
+
+
+/* --- ADAPTACIÓN DE CUADROS DE SELECCIÓN (SELECT) --- */
+
+/* Aplicamos el mismo ADN de los inputs a los selectores */
+#form-estudiante select,
+.custom-select {
+    width: 100% !important;
+    height: 50px !important; /* Altura idéntica a tus buscadores */
+    padding: 0 15px !important;
+    border-radius: 12px !important; /* Coincide con el estilo de tus modales */
+    border: 1px solid #d1d5db !important;
+    background-color: #ffffff !important;
+    font-size: 1.1rem !important;
+    font-family: 'Anek Devanagari', sans-serif !important;
+    color: var(--text-main) !important;
+    outline: none !important;
+    cursor: pointer !important;
+    
+    /* Quitamos la flecha por defecto del sistema */
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+
+    /* Añadimos una flecha moderna personalizada */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 15px center !important;
+    background-size: 18px !important;
+}
+
+/* Efecto focus para que brille igual que los buscadores */
+#form-estudiante select:focus,
+.custom-select:focus {
+    border-color: var(--primary-blue) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+/* Alineación de las etiquetas (labels) sobre los campos */
+#form-estudiante label {
+    display: block !important;
+    margin-bottom: 8px !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
+    font-size: 0.95rem !important;
+}
+
+
+
+/* --- ESTILO PARA ETIQUETAS DE FORMULARIO --- */
+
+#form-estudiante label,
+#form-responsable label {
+    display: block !important;
+    margin-bottom: 8px !important;
+    font-weight: 600 !important; /* Semibold para mejor lectura */
+    color: var(--text-muted) !important;
+    font-size: 1.05rem !important; /* Tamaño mediano solicitado */
+    font-family: 'Anek Devanagari', sans-serif !important;
+    text-align: left !important;
+}
+
+/* Espaciado entre grupos de campos */
+.form-group {
+    margin-bottom: 18px !important;
+}
+
+
+
+/* --- NOTIFICACIÓN DEL SISTEMA (ÉXITO/ERROR) --- */
+.notify-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: none; /* Se activa por JS */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    
+    /* ANIMACIÓN DE ENTRADA SUAVE DEL FONDO */
+    animation: fadeInOverlay 0.3s ease-out forwards;
+}
+
+.notify-card {
+    background: white;
+    padding: 35px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    
+    /* ANIMACIÓN DE ENTRADA (POP IN) */
+    /* Empieza pequeño y crece rápido */
+    animation: notifyPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    transform-origin: center center;
+}
+
+/* CLASE PARA LA SALIDA (Se debe agregar por JS antes de cerrar) */
+.notify-card.closing {
+    animation: notifyPopOut 0.2s ease-in forwards !important;
+}
+
+/* ANIMACIONES (KEYFRAMES) */
+
+/* 1. Entrada: Viene del fondo (scale 0.5) hacia adelante */
+@keyframes notifyPopIn {
+    0% { 
+        opacity: 0; 
+        transform: scale(0.5); 
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+}
+
+/* 2. Salida: Se va hacia el fondo (scale 0.5) y desaparece */
+@keyframes notifyPopOut {
+    0% { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+    100% { 
+        opacity: 0; 
+        transform: scale(0.5); 
+    }
+}
+
+/* 3. Entrada del Fondo Oscuro */
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+
+/* --- ESTILOS DE LOS ÍCONOS --- */
+.notify-card i { 
+    font-size: 70px; 
+    margin-bottom: 15px; 
+    
+    /* ANIMACIÓN DEL ÍCONO */
+    /* Aparece con un rebote elástico después de que aparece la tarjeta */
+    animation: iconBounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.1s both;
+}
+
+@keyframes iconBounce {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; } /* Rebote grande */
+    100% { transform: scale(1); }
+}
+
+
+/* Variante Éxito */
+.notify-card.success i { color: #10b981; }
+.notify-card.success { border-top: 5px solid #10b981; }
+
+/* Variante Error */
+.notify-card.error i { color: #ef4444; }
+.notify-card.error { 
+    border-top: 5px solid #ef4444;
+    /* Quitamos el 'shake' antiguo para no saturar la animación de entrada */
+}
+
+/* Resto de textos */
+.notify-card h3 { font-size: 1.6rem; margin-bottom: 10px; color: #1f2937; }
+.notify-card p { color: #6b7280; font-size: 1rem; margin-bottom: 5px; }
+.notify-card .identity-text { 
+    display: block; 
+    font-weight: 800; 
+    color: var(--primary-blue); 
+    margin: 10px 0;
+    text-transform: uppercase;
+}
+
+.notify-card .error-msg {
+    background: #fef2f2;
+    color: #b91c1c;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    border: 1px dashed #f87171;
+}
+
+
+/*Para que el icono de sincronización gire mientras guarda*/
+.rotate {
+    animation: rotation 1s infinite linear;
+}
+
+@keyframes rotation {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(359deg); }
+}
+
+
+
+/* --- NUEVO ESTADO ACTIVO: ÓVALO BLANCO Y LETRAS AZULES --- */
+.menu-item.active-item, 
+.dropdown-btn.active-item,
+.dropdown-content a.active-item {
+    background-color: #ffffff !important; /* Cuadro blanco */
+    color: #0369a1 !important;            /* Letras azules (puedes usar tu var de azul) */
+    border-radius: var(--radius-sm);       
+    margin: 4px 12px !important;          /* Separa el botón del borde del menú */
+    padding: 10px 15px !important;        /* Espacio interno para que el texto no toque el óvalo */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-left: none !important;         /* Quitamos la línea lateral anterior */
+}
+
+/* Color de los iconos cuando el botón está resaltado */
+.menu-item.active-item i, 
+.dropdown-btn.active-item i,
+.dropdown-content a.active-item i {
+    color: #0369a1 !important;
+}
+
+/* Ajuste sutil para los subelementos activos dentro de un dropdown */
+.dropdown-content a.active-item {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+
+/*-------------------*/
+/* EFECTO GLOBAL DE HUNDIMIENTO PARA BOTONES */
+.btn-primary:active, 
+.btn-cancel:active, 
+.btn-icon:active {
+    transform: scale(0.95) !important;
+    transition: transform 0.1s ease;
+}
+
+/* Aseguramos que el botón de cancelar tenga el mismo puntero */
+.btn-cancel {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+
+/*-------------------*/
+/* Estilo para botón desactivado (Cargando) */
+.btn-primary:disabled {
+    background-color: #94a3b8 !important; /* Un gris azulado */
+    cursor: not-allowed !important;
+    opacity: 0.8;
+    transform: none !important; /* Evita que se "hunda" si está desactivado */
+    box-shadow: none !important;
+}
+
+/*----------------------------------------------------------*/
+/* Buscador Ovalado y Moderno */
+
+
+.search-container-masivo:focus-within {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+}
+
+.search-container-masivo input {
+    border: none;
+    outline: none;
+    width: 100%;
+    font-size: 1rem;
+    color: var(--sidebar-dark);
+}
+
+.search-container-masivo i {
+    color: var(--text-muted);
+}
+
+
+/*--------------------------------------------------------*/
+/* Botón especial para Matrícula Masiva */
+/* Botón especial para Matrícula Masiva - BLINDAJE TOTAL */
+.btn-matricula-especial {
+    /* Colores base forzados */
+    background-color: #06b6d4 !important; /* Turquesa cian */
+    color: #ffffff !important;
+    
+    /* Dimensiones y visualización */
+    height: 45px !important;
+    width: 100% !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    
+    /* Alineación de contenido */
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px;
+    
+    /* Bordes y sombras */
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    
+    /* Texto */
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+/* Estado al pasar el cursor */
+.btn-matricula-especial:hover {
+    background-color: #0891b2 !important; /* Un cian más oscuro */
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Icono dentro del botón */
+.btn-matricula-especial i {
+    color: #ffffff !important;
+    font-size: 20px !important;
+    margin: 0 !important;
+}
+
+/* Estado desactivado */
+.btn-matricula-especial:disabled {
+    background-color: #94a3b8 !important;
+    color: #f1f5f9 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+
+/* Etiqueta de Año Académico: Estilo Botón Claro */
+.anio-indicador {
+    background-color: #f0f9ff !important; /* Azul muy claro/celeste */
+    color: #0369a1 !important; /* Azul profundo profesional */
+    padding: 8px 20px;
+    border-radius: 30px; /* Bordes redondeados estilo botón */
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: 1px solid #bae6fd; /* Borde sutil para dar definición */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.anio-indicador i {
+    font-size: 1.2rem;
+    color: #0ea5e9; /* Icono un poco más brillante */
+}
+
+/* Efecto sutil al pasar el mouse (opcional) */
+.anio-indicador:hover {
+    background-color: #e0f2fe !important;
+    transform: translateY(-1px);
+}
+
+
+
+/* Buscador con Botón Limpiar */
+.search-container-masivo {
+    position: relative; /* Para posicionar el botón limpiar */
+    width: 100%;
+    max-width: 500px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 50px;
+    padding: 8px 45px 8px 20px; /* Espacio extra a la derecha */
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.btn-clear-search {
+    position: absolute;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    display: none; /* Se activa por JS cuando hay texto */
+    padding: 0;
+}
+
+.btn-clear-search:hover {
+    color: #ef4444;
+}
+
+
+/*-----------------------------------------------------------*/
+/* Estilos para Pestañas (Tabs) */
+.tabs-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.tab-button {
+    padding: 12px 24px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-button.active {
+    color: #0ea5e9;
+    border-bottom-color: #0ea5e9;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/*FICHA DE MATRÍCULA*/
+/* Subtítulos Ovalados para el Expediente */
+.data-group {
+    margin-bottom: 25px;
+    padding: 10px;
+    border-bottom: 1px dashed #e2e8f0;
+}
+
+/* Títulos Ovalados para la Ficha de Matrícula */
+.modal-sub-header {
+    background-color: #e0f2fe !important; /* Celeste muy claro */
+    color: #0369a1 !important;           /* Azul fuerte */
+    padding: 6px 25px !important;
+    border-radius: 50px !important;      /* Forma de óvalo */
+    font-size: 0.8rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 15px !important;
+    margin-top: 10px !important;
+    display: inline-block !important;
+    border: 1px solid #bae6fd !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important; /* Forzar mayúsculas siempre */
+}
+
+/* Etiquetas de datos dentro de la ficha */
+.data-label {
+    font-weight: 800;
+    color: #64748b;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* Resaltado suave para etiquetas de la ficha */
+.data-label-highlight {
+    display: inline-block;
+    background-color: #f1f5f9; /* Gris muy suave */
+    color: #475569;            /* Gris azulado oscuro */
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-left: 3px solid #0ea5e9; /* Detalle cian lateral */
+}
+
+/* Etiqueta con cuadro celeste sin relleno */
+.data-label-outline {
+    display: inline-block;
+    color: #0369a1;            /* Azul profesional */
+    padding: 4px 4px;
+    border-radius: 6px;        /* Bordes suavemente redondeados */
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid #7dd3fc; /* Borde celeste claro */
+    background-color: transparent; /* Sin fondo */
+    margin-bottom: 4px;
+}
+
+
+/*--------------------------------------------------------------*/
+/* MEJORAS PARA EL MÓDULO DE RECIBOS */
+#content-area .desc-input {
+    font-size: 1.1rem !important; /* Aumento de tamaño de fuente */
+    padding: 14px 18px !important; /* Más espacio interno para que respire */
+    border: 2px solid #e2e8f0 !important; /* Borde más definido */
+    border-radius: 12px !important;
+    height: auto !important; /* Permitir que el padding defina la altura */
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+#content-area .desc-input:focus {
+    border-color: var(--primary-blue) !important;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1) !important; /* Resplandor azul al escribir */
+    background-color: #fff !important;
+}
+
+#content-area .data-label-outline {
+    font-size: 0.85rem !important; /* Etiquetas más legibles */
+    padding: 4px 12px !important;
+    margin-bottom: 8px !important;
+    letter-spacing: 0.5px;
+}
+
+/* Estilo para los iconos dentro de los inputs */
+.input-with-icon i {
+    font-size: 1.5rem !important;
+    color: var(--primary-blue) !important;
+}
+
+/*--------------------------------------------------------------------------*/
+/* --- ADAPTATIVIDAD (RESPONSIVE) --- */
+/* Si la pantalla se hace más pequeña (ej. Tablets o Laptops pequeñas) */
+@media (max-width: 1200px) {
+    .brand-title {
+        font-size: 1.3rem; /* Reducimos ligeramente el título */
+    }
+    .brand-subtitle {
+        font-size: 0.6rem;
+        letter-spacing: 1.5px; /* Ajustamos el espaciado para que quepa */
+    }
+    .header-logo-group img {
+        width: 36px; /* Logo un poco más chico */
+    }
+}
+
+
+
+
+
+/*-------------------------------------------*/
+/* --- SELECTOR DE MEDIO DE PAGO COMPACTO --- */
+.select-compact {
+    padding: 8px 15px !important; /* Reducimos de 16px a 8px */
+    height: 46px !important;      /* Ajustamos la altura total */
+    font-size: 1.2rem !important;
+    margin-top: 5px;
+    font-weight: 600;
+}
+
+/* Ajuste adicional para que la flecha del select no quede mal posicionada */
+.select-compact {
+    background-position: right 10px center !important;
+    background-size: 14px !important;
+}
+
+
+/*ANIMACIÓN DE CARGA--------------------------------------------------------------*/
+/* --- NOTIFICACIÓN DE CARGA (LOADING) --- */
+.notify-card.loading {
+    border-top: 5px solid var(--primary-blue);
+}
+
+/* Spinner grande y elegante para la notificación */
+.notify-spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid #e2e8f0;
+    border-top: 5px solid var(--primary-blue);
+    border-radius: 50%;
+    margin: 0 auto 20px auto; /* Centrado */
+    animation: spin 1s linear infinite;
+}
+
+/* Texto de carga pulsante */
+.loading-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-blue);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/*-----------------------------------------------------*/
+/* --- ESTILOS DASHBOARD --- */
+
+/* --- ESTILOS CRÍTICOS DEL DASHBOARD --- */
+.dashboard-container {
+    padding: 10px;
+}
+
+.dashboard-grid-top {
+    display: grid;
+    grid-template-columns: 1fr 350px; /* Columna izquierda para tarjetas, derecha para calendario */
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.metrics-area {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.dash-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid #eef2f6;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    display: block;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1;
+}
+
+.dashboard-grid-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.chart-card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-soft);
+}
+
+/* Animaciones */
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1100px) {
+    .dashboard-grid-top { grid-template-columns: 1fr; }
+    .dashboard-grid-charts { grid-template-columns: 1fr; }
+}
+
+
+/* --- ESTILOS DEL CALENDARIO --- */
+.calendar-day {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    color: #475569;
+    transition: all 0.2s;
+    cursor: default;
+}
+
+.calendar-day:hover {
+    background: #f1f5f9;
+}
+
+.calendar-day.today {
+    background: #2563eb;
+    color: white;
+    font-weight: 800;
+}
+
+.calendar-day.empty {
+    opacity: 0;
+}
+
+.btn-icon-small {
+    background: #f1f5f9;
+    border: none;
+    border-radius: 8px;
+    padding: 5px;
+    cursor: pointer;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+}
+
+.btn-icon-small:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+
+.select-calendar {
+    border: none;
+    background: #f8fafc;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    text-transform: capitalize;
+}
+
+.select-calendar:hover {
+    background: #f1f5f9;
+}
+
+/* Ocultar la flecha por defecto en algunos navegadores para un look más limpio */
+.select-calendar {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
