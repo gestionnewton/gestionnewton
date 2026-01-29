@@ -52,13 +52,15 @@ async function cargarConfiguracionInicial() {
 }
 
 
-
-// 3. LOGIN
+//3. LOGIN
 async function iniciarSesion() {
     const user = document.getElementById('user').value;
     const pass = document.getElementById('pass').value;
     const btn = document.querySelector('#login-form .btn-primary');
     const msg = document.getElementById('login-msg');
+
+    // 1. Intentamos leer la firma, si no existe no pasa nada (irá como null al servidor)
+    const dispositivoID = localStorage.getItem('newton_device_token');
 
     if (!user || !pass) { 
         msg.innerText = "Completa los campos."; 
@@ -71,18 +73,22 @@ async function iniciarSesion() {
     msg.innerText = "";
 
     try {
-        const response = await sendRequest('login', { user, pass });
+        const response = await sendRequest('login', { 
+            user, 
+            pass, 
+            idDispositivo: dispositivoID 
+        });
 
         if (response && response.status === 'success') {
+            // --- BLOQUE DE ÉXITO ---
             sessionStorage.setItem('sessionToken', response.token); 
             currentUser = response.data;
 
             btn.innerHTML = '<i class="material-icons rotate">settings</i> CARGANDO AÑO...';
             await cargarConfiguracionInicial();
-            // NUEVA CARGA ANTICIPADA UNIFICADA
+            
             btn.innerHTML = '<i class="material-icons rotate">sync</i> PREPARANDO PANEL...';
 
-            // Pedimos estadísticas y eventos al mismo tiempo ANTES de entrar
             const [resDash, resEv] = await Promise.all([
                 sendRequest('get_stats_dashboard', { idAnio: anioActivoID }),
                 sendRequest('get_events', { idAnio: anioActivoID })
@@ -91,24 +97,44 @@ async function iniciarSesion() {
             if (resDash.status === 'success') cacheDashboardData = resDash;
             if (resEv.status === 'success') cacheEventosCalendario = resEv.eventos;
 
-            // 1. Mostrar la interfaz principal
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
             document.getElementById('user-display-name').innerText = currentUser.name;
             document.getElementById('user-role-badge').innerText = currentUser.role;
             
-            // 2. Filtrar el menú según los permisos
             if (typeof filtrarMenuPorRol === 'function') {
                 filtrarMenuPorRol(currentUser.role);
             }
 
-            // --- ESTE ES EL CAMBIO CLAVE ---
-            // 3. CARGAR EL DASHBOARD AUTOMÁTICAMENTE
             loadView('dashboard'); 
-            // -------------------------------
 
         } else {
-            msg.innerText = response ? response.message : "Credenciales incorrectas";
+            // --- BLOQUE DE ERROR / SOLICITUD ---
+            const mensajeError = response ? response.message : "Credenciales incorrectas";
+            
+            // Si es error de dispositivo, mostramos la interfaz de solicitud
+            if (response.status === 'error' && mensajeError.includes("DISPOSITIVO")) {
+                // MEJORA: Si no hay ID, generamos uno ahora mismo para que la solicitud sea válida
+                let idParaSolicitud = dispositivoID;
+                if (!idParaSolicitud) {
+                    idParaSolicitud = 'NWT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                    localStorage.setItem('newton_device_token', idParaSolicitud);
+                }
+
+                msg.innerHTML = `
+                    <div style="color: #991b1b; margin-bottom: 10px; font-weight: bold;">${mensajeError}</div>
+                    <div style="padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; text-align: left;">
+                        <p style="font-size: 0.8rem; color: #475569; margin-bottom: 10px;">Esta PC no está registrada. Solicita acceso al administrador:</p>
+                        <input type="text" id="nombre-pc-solicitud" placeholder="Nombre de esta PC (Ej: Laptop Juan)" 
+                               style="width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                        <button type="button" onclick="enviarSolicitudAcceso('${idParaSolicitud}')" 
+                                class="btn-primary" style="background: #2563eb; width: 100%; height: 40px;">ENVIAR SOLICITUD</button>
+                    </div>
+                `;
+            } else {
+                msg.innerText = mensajeError;
+            }
+
             btn.disabled = false;
             btn.innerHTML = "Ingresar";
             btn.classList.remove('btn-active-effect');
@@ -281,7 +307,8 @@ function loadView(viewName, element = null) {
         case 'caja-diaria': renderCajaView(); break;
         case 'dashboard': title.innerText = "Panel de Control"; renderDashboardView();
         // Esta es la función que creamos en el paso anterior
-            break;         
+            break;    
+        case 'dispositivos': renderDispositivosView(); break;     
                 
         default:
             if(contentArea) {
@@ -5961,5 +5988,205 @@ async function procesarEliminarEvento(id) {
     } catch (e) {
         console.error(e);
         lanzarNotificacion('error', 'SISTEMA', 'No se pudo eliminar el evento.');
+    }
+}
+
+
+
+/*----------------------------VALIDACIÓN DE DISPOSITIVOS---------------------*/
+/* --- SCRIPT.JS: VISTA DE DISPOSITIVOS --- */
+
+/* --- SCRIPT.JS: VISTA DE DISPOSITIVOS CORREGIDA --- */
+
+async function renderDispositivosView() {
+    const content = document.getElementById('content-area'); 
+    if (!content) return;
+
+    const pcActualID = localStorage.getItem('newton_device_token') || 'NO REGISTRADA';
+
+    // 1. Pintamos la estructura base (esto se queda fijo)
+    content.innerHTML = `
+        <div class="view-container fade-in">
+            <div class="view-header">
+                <div>
+                    <h2 class="view-title">Gestión de Dispositivos</h2>
+                    <p class="view-subtitle">Control de acceso físico al sistema</p>
+                </div>
+            </div>
+
+            <div class="dash-card pc-identificadora" style="margin-bottom: 20px; border-left: 4px solid #2563eb; background: #f8fafc;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <i class="material-icons" style="color: #2563eb; font-size: 30px;">phonelink_setup</i>
+                    <div>
+                        <span style="display:block; font-size: 0.8rem; color:#64748b; font-weight: 600; text-transform: uppercase;">ID de esta computadora</span>
+                        <code style="font-size: 1.1rem; color: #1e293b; font-family: 'Courier New', monospace; font-weight: bold;">${pcActualID}</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-card">
+                <table class="main-table">
+                    <thead>
+                        <tr>
+                            <th>ID Dispositivo</th>
+                            <th>Nombre Asignado</th>
+                            <th>Estado</th>
+                            <th style="text-align:right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body-dispositivos">
+                        <tr><td colspan="4" style="text-align:center; padding:20px;">
+                            <i class="material-icons rotate" style="vertical-align: middle;">sync</i> Cargando...
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // 2. Llamamos a los datos
+    cargarTablaDispositivos();
+}
+
+async function cargarTablaDispositivos() {
+    try {
+        const res = await sendRequest('get_dispositivos');
+        const tbody = document.getElementById('body-dispositivos');
+        
+        if (!tbody) return;
+
+        if (res.status === 'success') {
+            if (res.dispositivos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No hay dispositivos registrados.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = res.dispositivos.map(d => {
+                // Configuración dinámica según el estado
+                const isPendiente = d.estado === 'PENDIENTE';
+                const isActivo = d.estado === 'ACTIVO';
+                
+                // Definir colores del Badge
+                let badgeBg = isActivo ? '#dcfce7' : (isPendiente ? '#fef3c7' : '#fee2e2');
+                let badgeColor = isActivo ? '#166534' : (isPendiente ? '#92400e' : '#991b1b');
+                
+                // Definir acción del botón principal
+                const iconoAccion = isActivo ? 'block' : 'check_circle';
+                const tituloAccion = isPendiente ? 'Aprobar Acceso' : (isActivo ? 'Desactivar' : 'Activar');
+                const proximoEstado = isActivo ? 'INACTIVO' : 'ACTIVO';
+
+                return `
+                <tr style="${isPendiente ? 'background-color: #fffbeb;' : ''}">
+                    <td>
+                        <small style="font-family: monospace; color:#64748b; font-weight: bold;">${d.id}</small>
+                        ${isPendiente ? '<br><span style="font-size: 10px; color: #b45309; font-weight: bold;">⚠️ SOLICITUD NUEVA</span>' : ''}
+                    </td>
+                    <td><strong>${d.nombre}</strong></td>
+                    <td>
+                        <span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(0,0,0,0.05);">
+                            ${d.estado}
+                        </span>
+                    </td>
+                    <td style="text-align:right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 5px;">
+                            <button onclick="cambiarEstadoPC('${d.id}', '${proximoEstado}')" 
+                                    class="btn-icon-small" 
+                                    style="color: ${isPendiente ? '#b45309' : (isActivo ? '#64748b' : '#166534')};"
+                                    title="${tituloAccion}">
+                                <i class="material-icons">${iconoAccion}</i>
+                            </button>
+                            <button onclick="eliminarPC('${d.id}')" 
+                                    class="btn-icon-small" 
+                                    style="color: #ef4444;"
+                                    title="Eliminar permanentemente">
+                                <i class="material-icons">delete</i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+    } catch (e) { 
+        console.error("Error cargando dispositivos:", e); 
+    }
+}
+
+
+
+async function cambiarEstadoPC(id, nuevoEstado) {
+    if (!confirm(`¿Deseas cambiar el estado a ${nuevoEstado}?`)) return;
+    
+    try {
+        const res = await sendRequest('update_dispositivo', { id, nuevoEstado });
+        if (res.status === 'success') {
+            lanzarNotificacion('success', 'ACTUALIZADO', res.message);
+            cargarTablaDispositivos();
+        }
+    } catch (e) { console.error(e); }
+}
+
+/* --- ACTUALIZAR EN SCRIPT.JS --- */
+
+async function eliminarPC(id) {
+    if (!confirm("⚠️ ¿Estás seguro de eliminar este dispositivo? Deberás registrarlo de nuevo para que pueda acceder.")) return;
+    
+    try {
+        const res = await sendRequest('delete_dispositivo', { id: id });
+        if (res.status === 'success') {
+            lanzarNotificacion('success', 'ELIMINADO', res.message);
+            cargarTablaDispositivos(); // Recargamos la tabla
+        }
+    } catch (e) { console.error(e); }
+}
+
+// Asegúrate de que el mapeo de tu tabla en cargarTablaDispositivos incluya esto:
+// <button onclick="eliminarPC('${d.id}')" class="btn-icon-small btn-danger" title="Eliminar">
+//     <i class="material-icons">delete</i>
+// </button>
+
+// Función para enviar la solicitud de accesoa de dispositivo
+async function enviarSolicitudAcceso() {
+    const inputNombre = document.getElementById('nombre-pc-solicitud');
+    const msg = document.getElementById('login-msg');
+    const nombre = inputNombre.value.trim();
+
+    if (!nombre) {
+        inputNombre.style.borderColor = '#ef4444';
+        alert("Por favor, escribe un nombre para identificar esta PC.");
+        return;
+    }
+
+    // 1. Obtener el ID actual o generar uno nuevo si es una PC virgen
+    let idActual = localStorage.getItem('newton_device_token');
+    
+    if (!idActual) {
+        idActual = 'NWT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        localStorage.setItem('newton_device_token', idActual);
+    }
+
+    // 2. Cambiar estado del botón para feedback visual
+    const btn = document.querySelector('#solicitud-container .btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="material-icons rotate">sync</i> ENVIANDO...';
+
+    try {
+        const res = await sendRequest('solicitar_acceso', { id: idActual, nombre: nombre });
+        
+        if (res.status === 'success') {
+            msg.innerHTML = `
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 10px; text-align: center;">
+                    <i class="material-icons" style="color: #16a34a; font-size: 48px;">check_circle</i>
+                    <p style="color: #166534; font-weight: bold; margin-top: 10px;">¡Solicitud enviada con éxito!</p>
+                    <p style="color: #166534; font-size: 13px;">Avisa al administrador para que apruebe tu acceso: <br> <strong>ID: ${idActual}</strong></p>
+                </div>
+            `;
+        } else {
+            throw new Error(res.message);
+        }
+    } catch (error) {
+        alert("Error: " + error.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="material-icons">send</i> REINTENTAR';
     }
 }
