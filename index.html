@@ -6,18 +6,22 @@
     <title>Intranet - Ciencias Aplicadas Sir Isaac Newton</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
     <div id="login-container" class="login-wrapper">
         <div class="login-card">
             <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Logo Newton" class="logo-login">
-            <h2>Bienvenido</h2>
-            <p>Ciencias Aplicadas Sir Isaac Newton</p>
+            <div class="brand-container" style="margin-bottom: 30px;">
+                        <span class="brand-title">NEWTON</span>
+                        <span class="brand-subtitle">GESTIÓN ESCOLAR</span>
+                    </div>
             <form id="login-form">
                 <input type="text" id="user" placeholder="Usuario" required>
                 <input type="password" id="pass" placeholder="Contraseña" required>
-                <button type="submit" class="btn-primary">Ingresar</button>
+                
+                <button type="button" class="btn-primary" onclick="iniciarSesion()">Ingresar</button>
             </form>
             <p id="login-msg" class="msg-error"></p>
         </div>
@@ -27,77 +31,87 @@
         
         <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Logo Pequeño">
-                <span>Newton App</span>
+                <div class="header-logo-group">
+                    <img src="https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png" alt="Logo Pequeño">
+                    <div class="brand-container">
+                        <span class="brand-title">NEWTON</span>
+                        <span class="brand-subtitle">GESTIÓN ESCOLAR</span>
+                    </div>
+                </div>
+                <i class="material-icons close-btn" id="close-sidebar-btn">close</i>
             </div>
 
             <nav class="sidebar-menu">
-    
-    <a href="#" class="menu-item" onclick="loadView('nuevo-recibo')" data-roles="SECRETARIA,ADMINISTRADOR">
-        <i class="material-icons">receipt</i> Nuevo Recibo
-    </a>
 
-    <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
-        <button class="dropdown-btn">
-            <span><i class="material-icons">monetization_on</i> Pagos</span>
-            <i class="material-icons arrow">expand_more</i>
-        </button>
-        <div class="dropdown-content">
-            <a href="#" onclick="loadView('conceptos')">Conceptos</a>
-            <a href="#" onclick="loadView('descuentos')">Descuentos</a>
-            <a href="#" onclick="loadView('recibos')">Recibos</a>
-            <a href="#" onclick="loadView('historial-pagos')">Historial de pagos</a>
-            <a href="#" onclick="loadView('egresos')">Egresos</a>
-            <a href="#" onclick="loadView('caja')">Caja</a>
-        </div>
-    </div>
+                <a href="#" class="menu-item" onclick="loadView('dashboard', this)" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO">
+                    <i class="material-icons">dashboard</i> Dashboard
+                </a>
+                
+                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo', this)" data-roles="SECRETARIA,ADMINISTRADOR">
+                    <i class="material-icons">receipt</i> Nuevo Recibo
+                </a>
 
-    <div class="menu-dropdown" data-roles="ADMINISTRADOR,DIRECTIVO,SECRETARIA">
-        <button class="dropdown-btn">
-            <span><i class="material-icons">school</i> Matrículas</span>
-            <i class="material-icons arrow">expand_more</i>
-        </button>
-        <div class="dropdown-content">
-            <a href="#" onclick="loadView('nueva-matricula')">Nueva Matrícula</a>
-            <a href="#" onclick="loadView('matricula-masiva')">Matrícula Masiva</a>
-            <a href="#" onclick="loadView('secciones')">Secciones</a>
-            <a href="#" onclick="loadView('traslados')">Traslados</a>
-        </div>
-    </div>
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">monetization_on</i> Pagos</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" data-roles="ADMINISTRADOR" onclick="loadView('conceptos', this)">Conceptos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('descuentos', this)">Descuentos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('recibos', this)">Recibos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('historial-pagos', this)">Historial de pagos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('egresos', this)">Egresos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('caja-diaria', this)">Caja</a>
+                    </div>
+                </div>
 
-    <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
-        <button class="dropdown-btn">
-            <span><i class="material-icons">group</i> Registros</span>
-            <i class="material-icons arrow">expand_more</i>
-        </button>
-        <div class="dropdown-content">
-            <a href="#" onclick="loadView('nuevo-estudiante')">Nuevo Estudiante</a>
-            <a href="#" onclick="loadView('nuevo-responsable')">Nuevo Responsable</a>
-            <a href="#" onclick="loadView('ver-estudiantes')">Ver Estudiantes</a>
-            <a href="#" onclick="loadView('ver-responsables')">Ver Responsables</a>
-        </div>
-    </div>
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,DIRECTIVO,SECRETARIA">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">school</i> Matrículas</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('matricula-masiva', this)">Nueva Matrícula</a>
+                        <a href="#" onclick="loadView('secciones-consultas', this)">Consultar</a>
+                        <a href="#" onclick="loadView('traslados', this)">Traslados</a>
+                    </div>
+                </div>
 
-    <div class="menu-dropdown" data-roles="ADMINISTRADOR">
-        <button class="dropdown-btn">
-            <span><i class="material-icons">settings</i> Configuración</span>
-            <i class="material-icons arrow">expand_more</i>
-        </button>
-        <div class="dropdown-content">
-            <a href="#" onclick="loadView('anio-academico')">Año Académico</a>
-            <a href="#" onclick="loadView('config-secciones')">Conf. Secciones</a>
-            <a href="#" onclick="loadView('usuarios')">Usuarios</a>
-        </div>
-    </div>
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">group</i> Registros</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('ver-estudiantes', this)">Estudiantes</a>
+                        <a href="#" onclick="loadView('ver-responsables', this)">Responsables</a>
+                    </div>
+                </div>
 
-    <a href="#" class="menu-item logout" onclick="logout()">
-        <i class="material-icons">exit_to_app</i> Cerrar Sesión
-    </a>
-</nav>
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR">
+                    <button class="dropdown-btn">
+                        <span><i class="material-icons">settings</i> Configuración</span>
+                        <i class="material-icons arrow">expand_more</i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="#" onclick="loadView('anio-academico', this)">Año Académico</a>
+                        <a href="#" onclick="loadView('config-secciones', this)">Conf. Secciones</a>
+                        <a href="#" onclick="loadView('usuarios', this)">Usuarios</a>
+                    </div>
+                </div>
+
+                <a href="#" class="menu-item logout" onclick="logout()">
+                    <i class="material-icons">exit_to_app</i> Cerrar Sesión
+                </a>
+            </nav>
         </aside>
 
         <main class="main-content">
             <header class="top-bar">
+                <button id="menu-toggle" class="menu-btn">
+                    <i class="material-icons">menu</i>
+                </button>
                 <h2 id="page-title">Panel de Control</h2>
                 <div class="user-info">
                     <span id="user-display-name">Usuario</span>
@@ -107,13 +121,29 @@
             
             <div id="content-area" class="content-wrapper">
                 <h3>Seleccione una opción del menú</h3>
-                <button onclick="testConnection()">Probar Conexión con Servidor</button>
             </div>
         </main>
     </div>
 
+    <div id="sidebar-overlay" class="overlay"></div>
+
+
+
+<div id="modal-global" class="modal-overlay" onclick="cerrarModalFuera(event)">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h3 id="modal-title">Título del Modal</h3>
+            <button class="close-btn" onclick="cerrarModal()" style="font-size: 2rem; color: #999;">&times;</button>
+        </div>
+        <div id="modal-body">
+            </div>
+    </div>
+</div>
+
+    
+
+
     <script src="script.js"></script>
+
 </body>
 </html>
-
-
