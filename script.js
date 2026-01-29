@@ -6146,47 +6146,50 @@ async function eliminarPC(id) {
 // </button>
 
 // Función para enviar la solicitud de accesoa de dispositivo
-async function enviarSolicitudAcceso() {
+/* --- EN SCRIPT.JS --- */
+
+async function enviarSolicitudAcceso(idRecibido) {
     const inputNombre = document.getElementById('nombre-pc-solicitud');
     const msg = document.getElementById('login-msg');
-    const nombre = inputNombre.value.trim();
-
-    if (!nombre) {
-        inputNombre.style.borderColor = '#ef4444';
-        alert("Por favor, escribe un nombre para identificar esta PC.");
+    
+    // 1. Validar que escribió un nombre
+    const nombrePc = inputNombre.value.trim();
+    if (!nombrePc) {
+        alert("Por favor, dale un nombre a esta computadora (ej: Laptop de Juan)");
+        inputNombre.focus();
         return;
     }
 
-    // 1. Obtener el ID actual o generar uno nuevo si es una PC virgen
-    let idActual = localStorage.getItem('newton_device_token');
-    
-    if (!idActual) {
-        idActual = 'NWT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-        localStorage.setItem('newton_device_token', idActual);
-    }
-
-    // 2. Cambiar estado del botón para feedback visual
-    const btn = document.querySelector('#solicitud-container .btn-primary');
+    // 2. Feedback visual en el botón
+    const btn = document.querySelector('#login-msg .btn-primary');
+    const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="material-icons rotate">sync</i> ENVIANDO...';
 
     try {
-        const res = await sendRequest('solicitar_acceso', { id: idActual, nombre: nombre });
-        
-        if (res.status === 'success') {
+        // 3. Llamada al servidor
+        const response = await sendRequest('solicitar_acceso', { 
+            id: idRecibido, 
+            nombre: nombrePc 
+        });
+
+        if (response.status === 'success') {
             msg.innerHTML = `
-                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 10px; text-align: center;">
-                    <i class="material-icons" style="color: #16a34a; font-size: 48px;">check_circle</i>
-                    <p style="color: #166534; font-weight: bold; margin-top: 10px;">¡Solicitud enviada con éxito!</p>
-                    <p style="color: #166534; font-size: 13px;">Avisa al administrador para que apruebe tu acceso: <br> <strong>ID: ${idActual}</strong></p>
+                <div style="background: #dcfce7; color: #166534; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0;">
+                    <i class="material-icons" style="vertical-align: bottom;">check_circle</i> 
+                    <strong>¡Solicitud enviada!</strong><br>
+                    Espera a que el administrador la apruebe.
                 </div>
             `;
         } else {
-            throw new Error(res.message);
+            alert(response.message);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     } catch (error) {
-        alert("Error: " + error.message);
+        console.error("Error al solicitar acceso:", error);
+        alert("Error de conexión al enviar la solicitud.");
         btn.disabled = false;
-        btn.innerHTML = '<i class="material-icons">send</i> REINTENTAR';
+        btn.innerHTML = originalText;
     }
 }
