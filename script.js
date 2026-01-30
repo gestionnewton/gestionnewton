@@ -2033,7 +2033,10 @@ function actualizarContadorSeleccionados() {
 /*CONSULTAS--------------------------------------------*/
 let dataConsultas = {};
 
+/* --- ACTUALIZACIÓN EN SCRIPT.JS --- */
+
 function renderSeccionesConsultasView() {
+    // ... (Validación de roles igual que antes) ...
     const rolesPermitidos = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO', 'AUXILIAR'];
     if (!rolesPermitidos.includes(currentUser.role)) {
         lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tienes permisos para ver esta sección.');
@@ -2053,7 +2056,7 @@ function renderSeccionesConsultasView() {
         </div>
 
         <div id="tab-estudiante" class="tab-content active">
-            <div class="card-config" style="background:white; padding:20px; border-radius:12px; margin-bottom:20px;">
+             <div class="card-config" style="background:white; padding:20px; border-radius:12px; margin-bottom:20px;">
                 <div class="search-container-masivo">
                     <i class="material-icons">search</i>
                     <input type="text" id="busqueda-historial" placeholder="Buscar por Apellido o DNI..." onkeyup="filtrarHistorialEstudiante()">
@@ -2065,13 +2068,7 @@ function renderSeccionesConsultasView() {
             <div class="table-container">
                 <table class="data-table">
                     <thead>
-                        <tr>
-                            <th>APELLIDOS Y NOMBRES</th>
-                            <th>DNI</th>
-                            <th>AÑO LECTIVO</th>
-                            <th>GRADO / SECCIÓN</th>
-                            <th>ESTADO</th>
-                            <th style="text-align:center;">ACCIONES</th> </tr>
+                        <tr><th>APELLIDOS Y NOMBRES</th><th>DNI</th><th>AÑO LECTIVO</th><th>GRADO / SECCIÓN</th><th>ESTADO</th><th>ACCIONES</th></tr>
                     </thead>
                     <tbody id="body-historial">
                         <tr><td colspan="6" style="text-align:center;">Use el buscador para ver el historial.</td></tr>
@@ -2083,34 +2080,28 @@ function renderSeccionesConsultasView() {
         <div id="tab-seccion" class="tab-content">
             <div class="card-config" style="background:white; padding:20px; border-radius:12px; margin-bottom:20px;">
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: flex-end;">
-                    <div>
-                        <label>Año Académico</label>
-                        <select id="con-anio" class="custom-select" onchange="actualizarFiltrosSeccion()"></select>
-                    </div>
-                    <div>
-                        <label>Nivel</label>
-                        <select id="con-nivel" class="custom-select" onchange="alCambiarNivel()"></select>
-                    </div>
-                    <div>
-                        <label>Grado</label>
-                        <select id="con-grado" class="custom-select" onchange="alCambiarGrado()"></select>
-                    </div>
-                    <div>
-                        <label>Sección</label>
-                        <select id="con-seccion" class="custom-select" onchange="consultarListaSeccion()"></select>
+                    <div><label>Año Académico</label><select id="con-anio" class="custom-select" onchange="actualizarFiltrosSeccion()"></select></div>
+                    <div><label>Nivel</label><select id="con-nivel" class="custom-select" onchange="alCambiarNivel()"></select></div>
+                    <div><label>Grado</label><select id="con-grado" class="custom-select" onchange="alCambiarGrado()"></select></div>
+                    <div><label>Sección</label><select id="con-seccion" class="custom-select" onchange="consultarListaSeccion()"></select></div>
+                    
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button onclick="imprimirListaSeccion()" class="btn-primary" style="background: #475569; width: 100%;">
+                            <i class="material-icons">print</i> IMPRIMIR LISTA
+                        </button>
                     </div>
                 </div>
             </div>
+            
             <div class="table-container">
-                <table class="data-table">
+                <table class="data-table" id="tabla-reporte-seccion">
                     <thead>
                         <tr>
                             <th>N°</th>
                             <th>DNI</th>
                             <th>APELLIDOS Y NOMBRES</th>
                             <th>FECHA MATRÍCULA</th>
-                            <th>ACCIONES</th>
-                        </tr>
+                            <th>ACCIONES</th> </tr>
                     </thead>
                     <tbody id="body-lista-seccion">
                         <tr><td colspan="5" style="text-align:center;">Seleccione los filtros para mostrar la lista.</td></tr>
@@ -5799,7 +5790,7 @@ function renderizarCalendario() {
 function obtenerColorCategoria(cat) {
     const colores = {
         'General':  '#2563eb',            // Azul
-        'PP.FF.': '#4b2d41',           // Morado
+        'PP.FF.': '#9c2796',           // Morado
         'Estudiantes': '#10b981',       // Verde
         'Personal Laboral': '#f59e0b'   // Naranja
     };
@@ -6239,3 +6230,118 @@ async function enviarSolicitudAcceso(idRecibido) {
     }
 }
 
+/*------------------------------------------------------------------------*/
+/* --- FUNCIÓN PARA GENERAR REPORTE A4 --- */
+function imprimirListaSeccion() {
+    // 1. Capturar datos de encabezado
+    const anio = document.getElementById('con-anio').options[document.getElementById('con-anio').selectedIndex]?.text;
+    const nivel = document.getElementById('con-nivel').options[document.getElementById('con-nivel').selectedIndex]?.text;
+    const grado = document.getElementById('con-grado').options[document.getElementById('con-grado').selectedIndex]?.text;
+    const seccion = document.getElementById('con-seccion').options[document.getElementById('con-seccion').selectedIndex]?.text;
+
+    // 2. Capturar filas de estudiantes
+    const filas = document.querySelectorAll('#body-lista-seccion tr');
+    
+    // Validación: Si no hay datos o dice "Seleccione filtros..."
+    if (filas.length === 0 || filas[0].innerText.includes('Seleccione') || filas[0].innerText.includes('No se encontraron')) {
+        lanzarNotificacion('error', 'SIN DATOS', 'Primero carga una lista de estudiantes para imprimir.');
+        return;
+    }
+
+    // 3. Construir filas para el reporte
+    let filasHTML = '';
+    let contador = 1;
+
+    filas.forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length > 2) { // Asegurar que es una fila de datos real
+            const dni = tds[1].innerText;
+            const nombre = tds[2].innerText;
+            
+            filasHTML += `
+                <tr>
+                    <td style="text-align:center;">${contador++}</td>
+                    <td>${nombre}</td>
+                    <td style="text-align:center;">${dni}</td>
+                    <td class="casillero"></td>
+                    <td class="casillero"></td>
+                    <td class="casillero"></td>
+                    <td class="casillero"></td>
+                    <td class="casillero"></td>
+                    <td class="casillero"></td>
+                </tr>
+            `;
+        }
+    });
+
+    // 4. Generar la ventana de impresión
+    const ventana = window.open('', '_blank');
+    ventana.document.write(`
+        <html>
+        <head>
+            <title>Lista de Clase - ${grado} ${seccion}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; font-size: 12px; }
+                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; }
+                .header p { margin: 5px 0; font-size: 14px; }
+                .info-box { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; background: #f1f5f9; padding: 10px; border-radius: 5px; border: 1px solid #cbd5e1; }
+                
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #333; padding: 6px; }
+                th { background-color: #e2e8f0; text-transform: uppercase; font-size: 10px; }
+                
+                /* Estilo de los casilleros vacíos */
+                .casillero { width: 30px; } 
+
+                @media print {
+                    @page { size: A4; margin: 10mm; }
+                    body { -webkit-print-color-adjust: exact; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Institución Educativa NEWTON</h1>
+                <p>Reporte de Matrícula y Asistencia</p>
+            </div>
+
+            <div class="info-box">
+                <span>AÑO: ${anio}</span>
+                <span>NIVEL: ${nivel}</span>
+                <span>GRADO: ${grado}</span>
+                <span>SECCIÓN: ${seccion}</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30px;">N°</th>
+                        <th>APELLIDOS Y NOMBRES</th>
+                        <th style="width: 70px;">DNI</th>
+                        <th class="casillero"></th>
+                        <th class="casillero"></th>
+                        <th class="casillero"></th>
+                        <th class="casillero"></th>
+                        <th class="casillero"></th>
+                        <th class="casillero"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filasHTML}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; text-align: right; font-size: 10px; color: #64748b;">
+                Generado el: ${new Date().toLocaleString()}
+            </div>
+            
+            <script>
+                window.onload = function() { window.print(); }
+            </script>
+        </body>
+        </html>
+    `);
+    ventana.document.close();
+}
