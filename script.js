@@ -5843,7 +5843,7 @@ function abrirModalEvento(fecha) {
     modalTitle.innerText = "Registrar Evento: " + fecha;
     
     modalBody.innerHTML = `
-        <form id="form-evento" class="fade-in" style="display: flex; flex-direction: column; gap: 15px; padding: 10px;">
+        <form id="form-evento" style="display: flex; flex-direction: column; gap: 15px; padding: 15px;">
             <input type="hidden" id="event-fecha" value="${fecha}">
             
             <div class="form-group">
@@ -5853,20 +5853,20 @@ function abrirModalEvento(fecha) {
 
             <div class="form-group">
                 <label class="form-label">Categoría</label>
-                <select id="event-categoria" class="form-input" style="cursor: pointer;">
-                    <option value="General">🌐 General</option>
-                    <option value="PP.FF.">👨‍👩‍👧‍👦 PP.FF.</option>
-                    <option value="Estudiantes">🎓 Estudiantes</option>
-                    <option value="Personal Laboral">💼 Personal Laboral</option>
+                <select id="event-categoria" class="form-input" style="height: 42px; cursor: pointer;">
+                    <option value="General">General</option>
+                    <option value="PP.FF.">PP.FF.</option>
+                    <option value="Estudiantes">Estudiantes</option>
+                    <option value="Personal Laboral">Personal Laboral</option>
                 </select>
             </div>
 
             <div class="form-group">
                 <label class="form-label">Descripción</label>
-                <textarea id="event-descripcion" rows="3" placeholder="Escribe aquí los detalles..." class="form-input" style="resize:none; padding-top: 10px;"></textarea>
+                <textarea id="event-descripcion" rows="4" placeholder="Escribe aquí los detalles del evento..." class="form-input" style="resize:none; padding-top: 10px; min-height: 80px;"></textarea>
             </div>
 
-            <button type="button" onclick="procesarGuardarEvento()" class="btn-primary" style="width: 100%; margin-top: 5px;">
+            <button type="button" onclick="procesarGuardarEvento()" class="btn-primary" style="width: 100%; margin-top: 10px; height: 45px;">
                 <i class="material-icons">save</i> GUARDAR EVENTO
             </button>
         </form>

@@ -1478,3 +1478,45 @@ body {
 .day-number {
     font-weight: 500;
 }
+
+/* UNIFICACIÓN DE ESTILOS PARA FORMULARIOS */
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif; /* O la fuente que uses */
+    border: 1px solid #cbd5e1; /* Borde gris suave */
+    border-radius: 8px;
+    background-color: #ffffff;
+    color: #1e293b;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box; /* Crucial para que el padding no desborde el ancho */
+}
+
+/* Efecto al hacer clic en cualquiera de los campos */
+.form-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Estilo específico para las etiquetas encima de los cuadros */
+.form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Ajuste para que el Select no se vea plano */
+select.form-input {
+    appearance: none; /* Quita el diseño por defecto del sistema operativo */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
