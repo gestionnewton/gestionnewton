@@ -2298,48 +2298,81 @@ function limpiarTablaSeccion() {
 
 
 /*Lógica de la Tabla y Modales - Pestaña POR SECCIÓN*/
+/* --- ACTUALIZAR EN SCRIPT.JS --- */
+
 function consultarListaSeccion() {
     const idSec = document.getElementById('con-seccion').value;
-    if (!idSec) { limpiarTablaSeccion(); return; }
-
-    const matriculados = dataConsultas.matriculas.filter(m => m.idSec === idSec && m.estado === 'ACTIVO');
     const tbody = document.getElementById('body-lista-seccion');
-    const puedeEditar = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role);
 
-    let html = "";
-    matriculados.forEach((m, index) => {
+    if (!tbody) return; // Seguridad
+
+    if (!idSec) { 
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Seleccione una sección.</td></tr>'; 
+        return; 
+    }
+
+    // 1. Filtrar matrículas activas de la sección
+    const matriculasRaw = dataConsultas.matriculas.filter(m => m.idSec === idSec && m.estado === 'ACTIVO');
+    
+    // 2. UNIR DATOS: Creamos una lista temporal que combina Matrícula + Estudiante
+    let listaCompleta = matriculasRaw.map(m => {
         const est = dataConsultas.estudiantes.find(e => e.id === m.idEst);
-        if (est) {
-            const nombreMayus = String(est.nombreCompleto).toUpperCase();
-            // Formatear la fecha de la hoja Matriculas
-            const fechaMat = m.fecha ? new Date(m.fecha).toLocaleDateString('es-ES') : '---';
+        return est ? { matricula: m, estudiante: est } : null;
+    }).filter(item => item !== null); // Filtramos si no se encontró el alumno (por seguridad)
 
-            html += `
-            <tr>
-                <td style="text-align:center;">${index + 1}</td>
-                <td style="font-family: monospace;">${est.dni}</td>
-                <td style="font-weight:700;">${nombreMayus}</td>
-                <td style="text-align:center; color: #64748b;">${fechaMat}</td>
-                <td style="text-align:center;">
-                    <div class="action-buttons" style="justify-content: center; gap: 8px;">
-                        <button class="btn-icon edit" style="background:#0ea5e9; color:white; width:auto; padding: 0 10px;" onclick="verExpediente('${est.id}', this)">
-                            <i class="material-icons">visibility</i> VER
-                        </button>
-                        
-                        ${puedeEditar ? `
-                        <button class="btn-icon delete" style="background:#f59e0b; color:white; width:auto; padding: 0 10px;" onclick="abrirModalEstado('${m.id}', '${m.estado}', '${nombreMayus}')">
-                            <i class="material-icons">history_edu</i> ESTADO
-                        </button>
-                        <button class="btn-icon" style="background:#14b8a6; color:white; width:auto; padding: 0 10px;" onclick="abrirModalCambiarSeccion('${m.id}', '${m.idSec}', '${nombreMayus}')">
-                            <i class="material-icons">swap_horiz</i> SECCIÓN
-                        </button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        }
+    // 3. ORDENAR ALFABÉTICAMENTE: Usamos el nombre del estudiante
+    listaCompleta.sort((a, b) => {
+        const nombreA = (a.estudiante.nombreCompleto || "").toString().toLowerCase();
+        const nombreB = (b.estudiante.nombreCompleto || "").toString().toLowerCase();
+        return nombreA.localeCompare(nombreB);
     });
-    tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;">No hay alumnos matriculados.</td></tr>';
+
+    const puedeEditar = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role);
+    let html = "";
+
+    // 4. GENERAR HTML (Ahora recorremos la lista ya ordenada)
+    listaCompleta.forEach((item, index) => {
+        const m = item.matricula;
+        const est = item.estudiante;
+        
+        const nombreMayus = String(est.nombreCompleto).toUpperCase();
+        
+        // Validación segura de fecha
+        let fechaMat = '---';
+        if (m.fecha) {
+             const d = new Date(m.fecha);
+             // Ajuste para evitar error "Invalid Date"
+             if (!isNaN(d.getTime())) {
+                 fechaMat = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+             }
+        }
+
+        html += `
+        <tr>
+            <td style="text-align:center;">${index + 1}</td>
+            <td style="font-family: monospace;">${est.dni}</td>
+            <td style="font-weight:700;">${nombreMayus}</td>
+            <td style="text-align:center; color: #64748b;">${fechaMat}</td>
+            <td style="text-align:center;">
+                <div class="action-buttons" style="justify-content: center; gap: 8px;">
+                    <button class="btn-icon edit" style="background:#0ea5e9; color:white; width:auto; padding: 0 10px;" onclick="verExpediente('${est.id}', this)" title="Ver Expediente">
+                        <i class="material-icons">visibility</i> VER
+                    </button>
+                    
+                    ${puedeEditar ? `
+                    <button class="btn-icon delete" style="background:#f59e0b; color:white; width:auto; padding: 0 10px;" onclick="abrirModalEstado('${m.id}', '${m.estado}', '${nombreMayus}')" title="Cambiar Estado">
+                        <i class="material-icons">history_edu</i> ESTADO
+                    </button>
+                    <button class="btn-icon" style="background:#14b8a6; color:white; width:auto; padding: 0 10px;" onclick="abrirModalCambiarSeccion('${m.id}', '${m.idSec}', '${nombreMayus}')" title="Traslado Interno">
+                        <i class="material-icons">swap_horiz</i> SECCIÓN
+                    </button>
+                    ` : ''}
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center; padding: 20px;">No hay alumnos matriculados en esta sección.</td></tr>';
 }
 
 // --- MODAL VER EXPEDIENTE ---
