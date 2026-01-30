@@ -4721,6 +4721,12 @@ async function cargarTablaHistorial() {
                             <button class="btn-icon view" onclick="verDetallePagoHistorial(${index})" title="Ver Detalle">
                                 <i class="material-icons">visibility</i>
                             </button>
+
+                            <button class="btn-icon delete" onclick="descargarPDFDesdeHistorial(${index})" 
+                                    title="Descargar PDF" 
+                                    style="background-color: #fef2f2; color: #ef4444; border: 1px solid #fee2e2;">
+                                <i class="material-icons">picture_as_pdf</i>
+                            </button>
                         </td>
                     </tr>
                     `;
@@ -7174,4 +7180,29 @@ function descargarTicketPDF(datosBorrador, nroRecibo) {
         cerrarNotify();
         lanzarNotificacion('error', 'ERROR', 'Fallo al generar PDF.');
     });
+}
+
+/* --- FUNCIÓN PUENTE PARA DESCARGAR DESDE HISTORIAL --- */
+function descargarPDFDesdeHistorial(index) {
+    const item = historialCache[index];
+    if (!item) return;
+
+    // La función descargarTicketPDF espera un array de ítems (borrador)
+    // Convertimos el pago individual en un array de un solo elemento
+    const datosParaPDF = [{
+        nombre: document.getElementById('hist-student-name').innerText, // Nombre del estudiante actual
+        nomCon: item.nomCon,
+        totalInd: item.total,
+        efectivo: item.efectivo,
+        digital: item.digital,
+        medio: item.medio,
+        codOp: item.codOp,
+        obs: item.obs,
+        fecha: item.fecha, // Usará esta fecha para el PDF
+        saldoPrevio: item.saldoPrevio || 0,
+        tipo: item.tipo || 'REGULAR'
+    }];
+
+    // Llamamos a tu función existente
+    descargarTicketPDF(datosParaPDF, item.nroRecibo);
 }
