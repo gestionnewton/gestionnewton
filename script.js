@@ -5716,15 +5716,13 @@ function renderizarCalendario() {
 
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const anioActual = new Date().getFullYear();
-    const mesActual = fechaCalendario.getMonth();
-    const anioCalendario = fechaCalendario.getFullYear();
+    const mesActual = parseInt(fechaCalendario.getMonth());
+    const anioCalendario = parseInt(fechaCalendario.getFullYear());
 
-    // 1. Llenar Selector de Meses (si está vacío)
+    // 1 y 2. Llenar Selectores (solo si están vacíos)
     if (selectMes.innerHTML === "") {
         selectMes.innerHTML = meses.map((m, idx) => `<option value="${idx}">${m}</option>`).join('');
     }
-    
-    // 2. Llenar Selector de Años (si está vacío) - Rango de 10 años
     if (selectAnio.innerHTML === "") {
         let opcionesAnio = "";
         for (let i = anioActual - 5; i <= anioActual + 5; i++) {
@@ -5733,67 +5731,79 @@ function renderizarCalendario() {
         selectAnio.innerHTML = opcionesAnio;
     }
 
-    // 3. Sincronizar selectores con la fecha actual del calendario
     selectMes.value = mesActual;
     selectAnio.value = anioCalendario;
 
-    // 4. Lógica de dibujo de días (Igual a la anterior)
     grid.innerHTML = "";
     const primerDiaMes = new Date(anioCalendario, mesActual, 1).getDay();
     const ultimoDiaMes = new Date(anioCalendario, mesActual + 1, 0).getDate();
     const hoy = new Date();
+    const hoyISO = hoy.toISOString().split('T')[0];
 
+    // Espacios vacíos al inicio
     for (let i = 0; i < primerDiaMes; i++) {
         const div = document.createElement('div');
         div.className = "calendar-day empty";
         grid.appendChild(div);
     }
 
-    /* --- ACTUALIZACIÓN EN script.js --- */
-
+    // Dibujar los días
     for (let dia = 1; dia <= ultimoDiaMes; dia++) {
-    const div = document.createElement('div');
-    div.className = "calendar-day";
-    div.style.position = "relative"; 
+        const div = document.createElement('div');
+        div.className = "calendar-day";
+        
+        // Formateamos la fecha del día actual en el bucle: YYYY-MM-DD
+        const mm = String(mesActual + 1).padStart(2, '0');
+        const dd = String(dia).padStart(2, '0');
+        const fechaISO = `${anioCalendario}-${mm}-${dd}`;
+        
+        // --- NORMALIZACIÓN Y BÚSQUEDA DE EVENTOS ---
+        const eventosDia = cacheEventosCalendario.filter(ev => {
+            if (!ev.fecha) return false;
+            // Convertimos cualquier formato de fecha del servidor a YYYY-MM-DD
+            const fechaEvFormateada = new Date(ev.fecha).toISOString().split('T')[0];
+            return fechaEvFormateada === fechaISO;
+        });
 
-    // Generar fecha ISO: yyyy-mm-dd (asegurando ceros a la izquierda)
-    const mm = String(mesActual + 1).padStart(2, '0');
-    const dd = String(dia).padStart(2, '0');
-    const fechaISO = `${anioCalendario}-${mm}-${dd}`;
-    
-    // Buscar eventos para esta fecha específica
-    const eventosDia = cacheEventosCalendario.filter(ev => {
-        // Limpiamos posibles espacios o formatos de hora sobrantes
-        const fechaEv = String(ev.fecha).substring(0, 10);
-        return fechaEv === fechaISO;
-    });
+        div.innerHTML = `<span class="day-number">${dia}</span>`;
 
-    div.innerHTML = `<span>${dia}</span>`;
+        // Si hay eventos, dibujamos los puntos por categoría
+        if (eventosDia.length > 0) {
+            const containerPuntos = document.createElement('div');
+            containerPuntos.className = "dots-container";
+            
+            // Creamos un puntito por cada evento (máximo 3 para no saturar)
+            eventosDia.slice(0, 3).forEach(ev => {
+                const dot = document.createElement('span');
+                dot.className = "event-dot";
+                dot.style.backgroundColor = obtenerColorCategoria(ev.categoria);
+                containerPuntos.appendChild(dot);
+            });
+            
+            div.appendChild(containerPuntos);
+            div.onclick = () => mostrarDetalleEventos(eventosDia, fechaISO);
+        } else {
+            div.onclick = () => abrirModalEvento(fechaISO);
+        }
 
-    if (eventosDia.length > 0) {
-        // Creamos el punto rojo
-        const dot = document.createElement('div');
-        dot.style.cssText = `
-            width: 6px; 
-            height: 6px; 
-            background: #ef4444; 
-            border-radius: 50%; 
-            position: absolute; 
-            bottom: 4px; 
-            left: 50%; 
-            transform: translateX(-50%);
-        `;
-        div.appendChild(dot);
-        div.onclick = () => mostrarDetalleEventos(eventosDia, fechaISO);
-    } else {
-        div.onclick = () => abrirModalEvento(fechaISO);
-    }
-
-        if (hoy.getMonth() === mesActual && hoy.getFullYear() === anioCalendario && hoy.getDate() === dia) {
+        // Resaltar el día de hoy
+        if (fechaISO === hoyISO) {
             div.classList.add('today');
         }
+        
         grid.appendChild(div);
     }
+}
+
+// Función auxiliar para colores
+function obtenerColorCategoria(cat) {
+    const colores = {
+        'General':  '#2563eb',            // Azul
+        'PP.FF.': '#4b2d41',           // Morado
+        'Estudiantes': '#10b981',       // Verde
+        'Personal Laboral': '#f59e0b'   // Naranja
+    };
+    return colores[cat] || '#ef4444';   // Rojo por defecto
 }
 
 // Nueva función para saltar a la fecha elegida en los combos

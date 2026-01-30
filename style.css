@@ -1448,3 +1448,33 @@ body {
     -moz-appearance: none;
     appearance: none;
 }
+
+/*ESTILOS PUNTITOS CALENDARIO*/
+.calendar-day {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dots-container {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+    justify-content: center;
+    width: 100%;
+}
+
+.event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.day-number {
+    font-weight: 500;
+}
