@@ -1115,7 +1115,9 @@ body {
 }
 
 .tab-button {
-    padding: 12px 24px;
+    padding: 14px 24px !important;
+    font-size: 16px !important;
+    letter-spacing: 0.5px;
     border: none;
     background: none;
     cursor: pointer;
@@ -1123,6 +1125,10 @@ body {
     color: #64748b;
     border-bottom: 3px solid transparent;
     transition: all 0.3s ease;
+}
+
+.tab-button .material-icons {
+    font-size: 22px !important;    /* Íconos más grandes */
 }
 
 .tab-button.active {
@@ -1479,6 +1485,28 @@ body {
     font-weight: 500;
 }
 
+/*--------*/
+/* Fuerza a que las celdas del calendario sean cuadradas y contenidas */
+.calendar-grid div {
+    aspect-ratio: 1 / 1; /* Mantiene los días como cuadrados perfectos */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem; /* Tamaño de fuente controlado */
+    border-radius: 8px;
+    transition: background 0.2s;
+    cursor: pointer;
+    min-width: 0; /* Evita que el contenido ensanche la columna */
+}
+
+/* Ajuste para los días de la semana (LUN, MAR, etc.) */
+.calendar-weekdays div {
+    padding: 5px 0;
+    letter-spacing: 0.5px;
+}
+
+
+
 /* UNIFICACIÓN DE ESTILOS PARA FORMULARIOS */
 .form-input {
     width: 100%;
@@ -1520,3 +1548,29 @@ select.form-input {
     background-size: 16px;
     padding-right: 40px;
 }
+
+
+/*-----------------------------------------------------------------*/
+/* Estilo para los botones de elección en la notificación */
+.choice-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+}
+
+.btn-choice {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.btn-choice:active { transform: scale(0.95); }
+.btn-print { background: #2563eb; color: white; }
+.btn-pdf { background: #ef4444; color: white; }

@@ -308,7 +308,8 @@ function loadView(viewName, element = null) {
         case 'dashboard': title.innerText = "Panel de Control"; renderDashboardView();
         // Esta es la función que creamos en el paso anterior
             break;    
-        case 'dispositivos': renderDispositivosView(); break;     
+        case 'dispositivos': renderDispositivosView(); break;
+        case 'reportes_pagos': renderReportesPagosView(); break;     
                 
         default:
             if(contentArea) {
@@ -3465,7 +3466,7 @@ function renderNuevoReciboView() {
                 <i class="material-icons" style="vertical-align:middle; margin-right:5px;">library_add</i> ADICIONAL
             </button>
             <button class="tab-button" onclick="cambiarPestanaRecibo(3, this)">
-                <i class="material-icons" style="vertical-align:middle; margin-right:5px;">warning</i> EXCEPCIONAL
+                <i class="material-icons" style="vertical-align:middle; margin-right:5px;">sell</i> EXCEPCIONAL
             </button>
         </div>
 
@@ -3622,51 +3623,71 @@ function cambiarPestanaRecibo(n, btn) {
  * Filtra la lista de alumnos cargada en dbRecibo.alumnos
  */
 function filtrarAlumnosRecibo() {
+    // --- 1. BLOQUEO DE SEGURIDAD (La Solución) ---
+    // Si dbRecibo es null, significa que la carga inicial no ha terminado.
+    if (!dbRecibo) {
+        console.warn("⏳ Esperando datos de Caja...");
+        return; // Detenemos la función para que no explote
+    }
+    // ---------------------------------------------
+
     const input = document.getElementById('rec-busqueda');
     const resDiv = document.getElementById('rec-resultados');
     const btnClean = document.getElementById('btn-clear-rec');
     
+    // Validación extra: Si el input no existe en el DOM, salimos
+    if (!input || !resDiv) return;
+
     const bus = input.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-    btnClean.style.display = bus.length > 0 ? 'block' : 'none';
+    if (btnClean) {
+        btnClean.style.display = bus.length > 0 ? 'block' : 'none';
+    }
 
     if (bus.length < 2) { 
         resDiv.style.display = 'none'; 
         return; 
     }
 
-    // --- CAMBIO CLAVE: Selección de la fuente de datos ---
+    // Selección de la fuente de datos con seguridad
     let fuenteDatos = [];
-    if (pestanaActivaRecibo === 3) {
-        // Pestaña 3: Busca en TODOS los estudiantes (incluso antiguos/externos)
-        fuenteDatos = dbRecibo.todosEstudiantes; 
+    
+    // Verificamos si la variable pestanaActivaRecibo está definida, si no, asumimos 1 (Regular)
+    const pestanaActual = (typeof pestanaActivaRecibo !== 'undefined') ? pestanaActivaRecibo : 1;
+
+    if (pestanaActual === 3) {
+        // Pestaña 3: Busca en TODOS (validamos que exista el array)
+        fuenteDatos = dbRecibo.todosEstudiantes || []; 
     } else {
-        // Pestaña 1 y 2: Busca solo en MATRICULADOS activos este año
-        fuenteDatos = dbRecibo.alumnos;
+        // Pestaña 1 y 2: Busca solo en MATRICULADOS (validamos que exista el array)
+        fuenteDatos = dbRecibo.alumnos || [];
     }
-    // ----------------------------------------------------
 
     const filtrados = fuenteDatos.filter(a => {
-        const nom = a.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const dni = String(a.dni); 
+        const nom = (a.nombre || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const dni = String(a.dni || ""); 
         return nom.includes(bus) || dni.includes(bus);
     });
 
     if (filtrados.length > 0) {
-        resDiv.innerHTML = filtrados.map(a => `
-            <div onclick='seleccionarAlumnoRec(${JSON.stringify(a)})' 
+        // NOTA: Usar JSON.stringify en onclick puede dar problemas con comillas simples en nombres (ej: O'Connor).
+        // Es mejor reemplazar las comillas simples por su entidad HTML si las hubiera.
+        resDiv.innerHTML = filtrados.map(a => {
+            const safeObj = JSON.stringify(a).replace(/'/g, "&#39;"); 
+            return `
+            <div onclick='seleccionarAlumnoRec(${safeObj})' 
                  style="padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: 0.2s;"
-                 onmouseover="this.style.background='var(--light-blue)'" 
+                 onmouseover="this.style.background='#e0f2fe'" 
                  onmouseout="this.style.background='white'">
-                <div style="font-weight: 700; color: var(--text-main);">${a.nombre}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                <div style="font-weight: 700; color: #1e293b;">${a.nombre}</div>
+                <div style="font-size: 0.8rem; color: #64748b;">
                     DNI: ${a.dni} ${a.secNom ? `| ${a.secNom}` : ''}
                 </div>
             </div>
-        `).join('');
+        `}).join('');
         resDiv.style.display = 'block';
     } else {
-        resDiv.innerHTML = '<div style="padding:15px; color:var(--text-muted);">Sin resultados.</div>';
+        resDiv.innerHTML = '<div style="padding:15px; color:#94a3b8;">Sin resultados.</div>';
         resDiv.style.display = 'block';
     }
 }
@@ -3827,6 +3848,11 @@ function calcularSaldoRecibo() {
     estSelRecibo.tipoConActual = con.tipo || 'REGULAR'; 
     // -------------------------------------------------------------------
 
+    // --- NUEVO: AQUÍ CAPTURAMOS LA FECHA PROGRAMADA ---
+    // Asegúrate de que tu backend esté enviando esta propiedad 'fecha' o 'fechaProg'
+    estSelRecibo.fechaProg = con.fechaProg || con.fecha || null; 
+    // --------------------------------------------------
+
     const divInfoExtra = panelMontos.querySelector('div:first-child');
     const lblTituloSaldo = document.querySelector('#rec-txt-saldo').nextElementSibling;
     const txtSaldo = document.getElementById('rec-txt-saldo');
@@ -3899,10 +3925,10 @@ function agregarItemBorrador() {
     if (total <= 0) return;
 
     let saldoAGuardar = 0;
-    if (pestanaActivaRecibo === 3) {
+    if (typeof pestanaActivaRecibo !== 'undefined' && pestanaActivaRecibo === 3) {
         saldoAGuardar = 0; 
     } else {
-        saldoAGuardar = parseFloat(estSelRecibo.saldoPendiente);
+        saldoAGuardar = parseFloat(estSelRecibo.saldoPendiente || 0);
     }
 
     borradorRecibo.push({
@@ -3910,14 +3936,17 @@ function agregarItemBorrador() {
         nombre: estSelRecibo.nombre,
         idCon: estSelRecibo.idConActual,
         nomCon: estSelRecibo.nomConActual,
-        
-        // --- NUEVO: Pasamos el tipo al borrador ---
-        tipo: estSelRecibo.tipoConActual, 
-        // ------------------------------------------
+        tipo: estSelRecibo.tipoConActual,
 
         efectivo: efec,
         digital: digi,
         totalInd: total,
+        
+        // --- CORRECCIÓN AQUÍ ---
+        // Tomamos la fecha del objeto seleccionado actualmente
+        fechaProg: estSelRecibo.fechaProg || null, 
+        // -----------------------
+
         saldoPrevio: saldoAGuardar
     });
 
@@ -4031,18 +4060,21 @@ async function enviarProcesarRecibo() {
 
     // 4. Manejo de Respuesta
     if (res.status === 'success') {
-        lanzarNotificacion('success', 'ÉXITO', `Recibo N° ${res.nroRecibo} generado correctamente.`);
-    
-        // --- LLAMADA A LA IMPRESIÓN ---
-        // Pasamos una copia del borrador actual antes de limpiarlo
-        const copiaBorrador = JSON.parse(JSON.stringify(borradorRecibo));
-        imprimirTicket(res.nroRecibo, copiaBorrador, tieneDigital ? medioDig : "", tieneDigital ? codOp : "", obs);
-        // ------------------------------
+        // 1. Notificación silenciosa de éxito en la base de datos
+        console.log(`Recibo N° ${res.nroRecibo} guardado.`);
 
-        // LIMPIEZA TOTAL PARA NUEVA OPERACIÓN
+        // 2. Preparamos los datos para la acción posterior
+        const copiaBorrador = JSON.parse(JSON.stringify(borradorRecibo));
+        const mDig = tieneDigital ? medioDig : "";
+        const cOp = tieneDigital ? codOp : "";
+        
+        // 3. NUEVA FUNCIÓN DE ELECCIÓN
+        preguntarAccionRecibo(res.nroRecibo, copiaBorrador, mDig, cOp, obs);
+
+        // 4. Limpieza de la interfaz (igual que antes)
         borradorRecibo = [];
         estSelRecibo = null;
-        renderNuevoReciboView(); // Reinicia la vista limpia
+        renderNuevoReciboView();
     } else {
         lanzarNotificacion('error', 'ERROR', res.message);
 
@@ -4059,14 +4091,62 @@ async function enviarProcesarRecibo() {
 }
 
 
+function preguntarAccionRecibo(nro, datos, medio, cod, obs) {
+    // Usamos el sistema de notificaciones que ya tienes para mostrar la elección
+    // Nota: Ajusta 'lanzarNotificacion' si tu sistema no permite inyectar HTML complejo, 
+    // de lo contrario, usa un SweetAlert o un div flotante.
+    
+    const areaNotif = document.getElementById('notification-area'); // O el ID de tu contenedor de avisos
+    
+    const htmlEleccion = `
+        <div id="modal-eleccion-recibo" style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; border-top: 5px solid #2563eb;">
+            <i class="material-icons" style="font-size: 40px; color: #10b981;">check_circle</i>
+            <h3 style="margin: 10px 0;">¡Recibo Generado!</h3>
+            <p>¿Qué desea hacer con el <b>N° ${nro}</b>?</p>
+            
+            <div class="choice-container">
+                <button class="btn-choice btn-print" id="opt-imprimir">
+                    <i class="material-icons">print</i> IMPRIMIR
+                </button>
+                <button class="btn-choice btn-pdf" id="opt-pdf">
+                    <i class="material-icons">picture_as_pdf</i> DESCARGAR
+                </button>
+            </div>
+            
+            <button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; background:none; border:none; color:#64748b; cursor:pointer; text-decoration:underline;">Cerrar sin acciones</button>
+        </div>
+    `;
+
+    // Mostramos el modal (puedes adaptarlo a tu función lanzarNotificacion)
+    const overlay = document.createElement('div');
+    overlay.id = "overlay-eleccion";
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999;";
+    overlay.innerHTML = htmlEleccion;
+    document.body.appendChild(overlay);
+
+    // ASIGNAR EVENTOS A LOS BOTONES
+    document.getElementById('opt-imprimir').onclick = () => {
+        imprimirTicket(nro, datos, medio, cod, obs);
+        document.body.removeChild(overlay);
+    };
+
+    document.getElementById('opt-pdf').onclick = () => {
+        descargarTicketPDF(datos, nro);
+        document.body.removeChild(overlay);
+    };
+}
+
 /*------------------------------------------------------------------*/
 /*IMPRIMIR RECIBO------------------------------*/
+/* --- ACTUALIZAR EN SCRIPT.JS --- */
+
 function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
-    const fecha = new Date().toLocaleString('es-PE');
+    const fechaActual = new Date();
+    const fechaStr = fechaActual.toLocaleString('es-PE');
     const logoUrl = 'https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png';
     const granTotal = datosBorrador.reduce((sum, it) => sum + it.totalInd, 0);
 
-    // Creamos un iframe invisible en el DOM
+    // Iframe invisible
     let iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -4076,7 +4156,6 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
     iframe.style.border = '0';
     document.body.appendChild(iframe);
 
-    // El contenido HTML del ticket
     let ticketHTML = `
     <html>
     <head>
@@ -4107,19 +4186,47 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
             <span style="font-size: 7.5pt;">Calle Aurelio de la Fuente N° 102-104 - Mollendo</span><br>
             <div class="line"></div>
             <span class="bold" style="font-size: 11pt;">RECIBO N° ${nroRecibo}</span><br>
-            <span>${fecha}</span>
+            <span>${fechaStr}</span>
         </div>
         <div class="line"></div>
         <div class="bold" style="margin-bottom:8px;">DETALLE DE PAGO:</div>
     `;
 
     datosBorrador.forEach((it, idx) => {
-        // Cálculo del Saldo (solo relevante si no es excepcional)
         const saldoRestante = (it.saldoPrevio || 0) - it.totalInd; 
         
-        // CONDICIÓN: Si el tipo es EXCEPCIONAL, NO mostramos la línea de saldo
+        // --- NUEVA LÓGICA DE ESTADO (Retraso vs Puntual) ---
+        let bloqueEstado = "";
+
+        // Solo calculamos si el ítem tiene una fecha programada válida
+        if (it.fechaProg) {
+            const fechaProg = new Date(it.fechaProg);
+            const hoy = new Date();
+            
+            // Ajustamos a medianoche para comparar solo días, ignorando horas
+            hoy.setHours(0,0,0,0);
+            fechaProg.setHours(0,0,0,0);
+            
+            // Verificamos que sea una fecha válida antes de calcular
+            if (!isNaN(fechaProg.getTime())) {
+                const diffTime = hoy - fechaProg;
+                // Convertimos milisegundos a días
+                const diasAtraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diasAtraso > 0) {
+                    // CASO: MOROSO
+                    bloqueEstado = `<div style="font-size: 8pt; font-weight:bold; margin-top:2px;">Días de retraso: ${diasAtraso}</div>`;
+                } else {
+                    // CASO: PUNTUAL (0 o negativo)
+                    bloqueEstado = `<div style="font-size: 8pt; font-style:italic; margin-top:2px;">Pago puntual.</div>`;
+                }
+            }
+        }
+        // ----------------------------------------------------
+
+        // Saldo pendiente (Oculto si es pago Excepcional)
         const bloqueSaldo = (it.tipo !== 'EXCEPCIONAL') ? `
-            <div style="font-size: 8pt; border-left: 2px solid #000; padding-left: 4px; margin-top: 2px;">
+            <div style="font-size: 8pt; margin-top: 2px;">
                 SALDO PENDIENTE: S/ ${saldoRestante.toFixed(2)}
             </div>` : '';
 
@@ -4129,7 +4236,9 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
             <div style="padding-left: 3px; font-size: 8.5pt;">
                 > ${it.nomCon}<br>
                 <span>Pagado: S/ ${it.totalInd.toFixed(2)}</span><br>
-                ${bloqueSaldo}
+                <div style="border-left: 2px solid #000; padding-left: 4px; margin-top:2px;">
+                   ${bloqueSaldo}
+                   ${bloqueEstado} </div>
             </div>
         </div>`;
     });
@@ -4156,25 +4265,21 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
     ticketHTML += `
         <div class="line"></div>
         <div class="center" style="font-size: 8.5pt; margin-top: 15px;">
-            ¡Gracias por su confianza!<br>
+            ***Gracias por su compromiso y responsabilidad.***<br>
             <span style="font-size: 7pt;">Este es un comprobante interno de pago.</span>
         </div>
         <div style="height: 30px;"></div>
     </body>
     </html>`;
 
-    // Escribir en el iframe e imprimir
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write(ticketHTML);
     doc.close();
 
-    // Esperar un momento a que carguen los estilos y la imagen antes de imprimir
     iframe.contentWindow.focus();
     setTimeout(() => {
         iframe.contentWindow.print();
-        // Opcional: Eliminar el iframe después de imprimir
-        // document.body.removeChild(iframe); 
     }, 1000);
 }
 
@@ -4267,14 +4372,21 @@ async function buscarReciboFinal() {
             
             area.innerHTML = `
                 <div class="animate__animated animate__fadeIn" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:24px; padding:30px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <h3 style="margin:0; color:var(--primary-dark); font-size:1.5rem;">Detalle del Recibo N° ${nro}</h3>
                             <span style="color:var(--text-muted); font-weight:600;">Fecha de emisión: ${d[0].fecha}</span>
                         </div>
-                        <button class="btn-matricula-especial" onclick='reimprimirDesdeBusqueda(${JSON.stringify(d)}, "${nro}")' style="width:auto; padding:12px 30px; font-size:1.1rem;">
-                            <i class="material-icons" style="margin-right:10px;">print</i> REIMPRIMIR TICKET
-                        </button>
+                        
+                        <div style="display:flex; gap: 10px;">
+                            <button class="btn-matricula-especial" onclick='reimprimirDesdeBusqueda(${JSON.stringify(d)}, "${nro}")' style="width:auto; padding:12px 20px; font-size:1rem;">
+                                <i class="material-icons" style="margin-right:8px;">print</i> REIMPRIMIR
+                            </button>
+
+                            <button class="btn-matricula-especial" onclick='descargarTicketPDF(${JSON.stringify(d)}, "${nro}")' style="width:auto; padding:12px 20px; font-size:1rem; background-color: #ef4444; color: white; border: 1px solid #dc2626;">
+                                <i class="material-icons" style="margin-right:8px;">picture_as_pdf</i> PDF
+                            </button>
+                        </div>
                     </div>
                     
                     <div style="background:white; border-radius:18px; border:1px solid #e2e8f0; overflow:hidden;">
@@ -4349,11 +4461,13 @@ function reimprimirDesdeBusqueda(datos, nro) {
 let listaEstudiantesGlobal = []; // Para el buscador local
 let historialCache = [];         // Para ver detalles sin volver a pedir al servidor
 
+/* --- ACTUALIZAR EN SCRIPT.JS --- */
+
 function renderHistorialPagosView() {
-    // 1. SEGURIDAD: Permisos
+    // 1. SEGURIDAD
     const rolesPermitidos = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'];
     if (!rolesPermitidos.includes(currentUser.role)) {
-        lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tiene permisos para ver el historial de pagos.');
+        lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tiene permisos para ver el historial.');
         return;
     }
 
@@ -4362,12 +4476,11 @@ function renderHistorialPagosView() {
         <div class="module-header">
             <div>
                 <h2>Historial de Pagos</h2>
-                <p>Consulte todas las operaciones registradas por estudiante y año.</p>
+                <p>Consulte todas las operaciones registradas por estudiante.</p>
             </div>
             <div class="anio-indicador">
-                <i class="material-icons">history_edu</i>
-                <span>CONSULTAS</span>
-            </div>
+                <i class="material-icons">calendar_today</i>
+                <span>${anioActivoNombre}</span> </div>
         </div>
 
         <div class="card-config" style="background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: var(--shadow-sm);">
@@ -4375,8 +4488,8 @@ function renderHistorialPagosView() {
                 
                 <div style="flex: 0 0 150px;">
                     <label style="font-weight: 600; margin-bottom: 8px; display: block;">Año Académico</label>
-                    <select id="hist-anio" class="custom-select" onchange="recargarHistorialSiHayEstudiante()">
-                        <option value="">Cargando...</option>
+                    <select id="hist-anio" class="custom-select" disabled style="background-color: #f1f5f9; cursor: not-allowed;">
+                        <option value="${anioActivoID}" selected>${anioActivoNombre}</option>
                     </select>
                 </div>
 
@@ -4396,9 +4509,9 @@ function renderHistorialPagosView() {
         </div>
 
         <div class="table-container" id="hist-table-container" style="display:none; animation: fadeIn 0.3s ease;">
-            <div style="padding: 15px 20px; background: var(--primary-blue); color: white; display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding: 15px 20px; background: #2563eb; color: white; display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin:0; font-size: 1.1rem; color: white;" id="hist-student-name">Estudiante Seleccionado</h3>
-                <span class="badge" style="background: white; color: var(--primary-blue);" id="hist-count">0 Operaciones</span>
+                <span class="badge" style="background: white; color: #2563eb;" id="hist-count">0 Operaciones</span>
             </div>
             
             <table class="data-table">
@@ -4414,37 +4527,25 @@ function renderHistorialPagosView() {
                     </tr>
                 </thead>
                 <tbody id="hist-table-body">
-                    </tbody>
+                </tbody>
             </table>
         </div>
     `;
 
-    // Inicializamos cargando la lista de años y estudiantes
+    // Inicializamos (Ahora es más simple, solo carga estudiantes)
     inicializarVistaHistorial();
 }
 
+/* --- ACTUALIZAR EN SCRIPT.JS --- */
+
 async function inicializarVistaHistorial() {
     try {
-        // 1. Cargar Años
-        const resAnios = await sendRequest('get_anios');
+        // YA NO CARGAMOS AÑOS. USAMOS LA VARIABLE GLOBAL.
         
-        // VERIFICACIÓN: ¿Seguimos en la pestaña de Historial?
-        const selectAnio = document.getElementById('hist-anio');
-        if (!selectAnio) return; // Si no existe, el usuario cambió de pestaña. Salimos.
-
-        if (resAnios.status === 'success') {
-            selectAnio.innerHTML = resAnios.data.map(a => 
-                `<option value="${a.id}" ${a.id === anioActivoID ? 'selected' : ''}>${a.nombre}</option>`
-            ).join('');
-        }
-
-        // 2. Cargar Estudiantes
+        // Cargar Lista de Estudiantes (Para el buscador)
         const resEst = await sendRequest('get_estudiantes');
         
-        // VERIFICACIÓN: ¿Seguimos aquí antes de guardar en la variable global?
-        // Aunque listaEstudiantesGlobal no es un elemento del DOM, es buena práctica
-        // confirmar que el contenedor principal de la vista aún existe.
-        if (!document.getElementById('hist-search')) return;
+        if (!document.getElementById('hist-search')) return; // Seguridad si cambiamos de pestaña
 
         if (resEst.status === 'success') {
             listaEstudiantesGlobal = resEst.data.map(e => ({
@@ -4455,11 +4556,7 @@ async function inicializarVistaHistorial() {
         }
 
     } catch (error) {
-        console.error("Error en inicializarVistaHistorial:", error);
-        // Solo lanzamos la notificación si el error es real y no porque el usuario se fue de la pestaña
-        if (document.getElementById('hist-anio')) {
-            lanzarNotificacion('error', 'CONEXIÓN', 'Error al cargar datos iniciales.');
-        }
+        console.error("Error historial:", error);
     }
 }
 
@@ -4542,13 +4639,12 @@ function recargarHistorialSiHayEstudiante() {
 
 
 async function cargarTablaHistorial() {
-    const idAnio = document.getElementById('hist-anio').value;
+    const idAnio = anioActivoID;
     const tbody = document.getElementById('hist-table-body');
     const container = document.getElementById('hist-table-container');
     
-    // Mostramos la tabla con estado de carga
     container.style.display = 'block';
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 30px;"><div class="spinner"></div> Buscando operaciones...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 30px;"><div class="spinner"></div> Analizando cuenta corriente...</td></tr>`;
 
     try {
         const res = await sendRequest('get_historial_estudiante', {
@@ -4557,42 +4653,87 @@ async function cargarTablaHistorial() {
         });
 
         if (res.status === 'success') {
-            historialCache = res.data; // Guardamos en memoria para el modal
-            document.getElementById('hist-count').innerText = `${historialCache.length} Operaciones`;
+            const pagos = res.pagos || [];
+            const deudas = res.pendientes || [];
 
-            if (historialCache.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">No se encontraron pagos registrados en este año académico.</td></tr>`;
+            document.getElementById('hist-count').innerText = `${pagos.length} Pagos | ${deudas.length} Pendientes`;
+
+            if (pagos.length === 0 && deudas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">Sin movimientos registrados.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = historialCache.map((item, index) => {
-                // Lógica visual para método de pago
-                const metodo = item.digital > 0 ? 
-                    `<span style="color: #0ea5e9; font-weight:600;"><i class="material-icons" style="font-size:14px;">smartphone</i> ${item.medio || 'DIGITAL'}</span>` : 
-                    `<span style="color: #059669; font-weight:600;"><i class="material-icons" style="font-size:14px;">payments</i> EFECTIVO</span>`;
+            let html = "";
 
-                return `
-                <tr>
-                    <td style="font-weight:700;">${item.nroRecibo}</td>
-                    <td>${item.nomCon}</td>
-                    <td>${item.fecha}</td>
-                    <td>${metodo}</td>
-                    <td>${item.codOp || '---'}</td>
-                    <td style="text-align: right; font-weight: bold;">S/ ${item.total.toFixed(2)}</td>
-                    <td style="text-align: center;">
-                        <button class="btn-icon view" onclick="verDetallePago(${index})" title="Ver Detalle Completo">
-                            <i class="material-icons">visibility</i>
-                        </button>
+            // 1. SECCIÓN DE DEUDAS (PENDIENTES) - Resaltado
+            if (deudas.length > 0) {
+                html += `
+                <tr style="background-color: #fef2f2; border-bottom: 2px solid #fee2e2;">
+                    <td colspan="7" style="padding: 10px; color: #b91c1c; font-weight: bold; text-transform: uppercase; font-size: 0.85rem;">
+                        <i class="material-icons" style="font-size: 16px; vertical-align: bottom;">warning</i> 
+                        Pagos Pendientes (${deudas.length})
                     </td>
                 </tr>
                 `;
-            }).join('');
+
+                html += deudas.map(d => `
+                <tr style="background-color: #fff1f2;">
+                    <td style="color: #ef4444; font-weight:bold;">PENDIENTE</td>
+                    <td style="font-weight:600;">${d.nomCon} <span style="font-size:10px; background:#fee2e2; color:#991b1b; padding:2px 4px; border-radius:4px;">${d.tipoCon}</span></td>
+                    <td style="color: #7f1d1d; font-size: 0.9em;">Costo: S/ ${d.montoOriginal}</td>
+                    <td colspan="2" style="color: #7f1d1d; font-size: 0.9em;">
+                        ${d.pagado > 0 ? `Abonado: S/ ${d.pagado.toFixed(2)}` : 'Sin abonos'}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #dc2626;">S/ ${d.saldo.toFixed(2)}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-icon delete" style="opacity:0.6; cursor:default;"><i class="material-icons">money_off</i></button>
+                    </td>
+                </tr>
+                `).join('');
+            }
+
+            // 2. SECCIÓN DE PAGOS REALIZADOS
+            if (pagos.length > 0) {
+                html += `
+                <tr style="background-color: #f0fdf4; border-bottom: 2px solid #dcfce7; border-top: 2px solid #e2e8f0;">
+                    <td colspan="7" style="padding: 10px; color: #15803d; font-weight: bold; text-transform: uppercase; font-size: 0.85rem;">
+                        <i class="material-icons" style="font-size: 16px; vertical-align: bottom;">check_circle</i> 
+                        Historial de Pagos (${pagos.length})
+                    </td>
+                </tr>
+                `;
+
+                html += pagos.map((item, index) => {
+                    const metodo = item.digital > 0 ? 
+                        `<span style="color: #0ea5e9; font-weight:600;"><i class="material-icons" style="font-size:14px;">smartphone</i> ${item.medio || 'DIGITAL'}</span>` : 
+                        `<span style="color: #059669; font-weight:600;"><i class="material-icons" style="font-size:14px;">payments</i> EFECTIVO</span>`;
+
+                    return `
+                    <tr>
+                        <td style="font-weight:700; font-family:monospace;">${item.nroRecibo}</td>
+                        <td>${item.nomCon}</td>
+                        <td>${item.fecha}</td>
+                        <td>${metodo}</td>
+                        <td>${item.codOp || '---'}</td>
+                        <td style="text-align: right; font-weight: bold; color: #1e293b;">S/ ${item.total.toFixed(2)}</td>
+                        <td style="text-align: center;">
+                            <button class="btn-icon view" onclick="verDetallePagoHistorial(${index}, '${JSON.stringify(item).replace(/'/g, "&#39;")}')">
+                                <i class="material-icons">visibility</i>
+                            </button>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            }
+
+            tbody.innerHTML = html;
 
         } else {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: red;">${res.message}</td></tr>`;
         }
 
     } catch (error) {
+        console.error(error);
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: red;">Error de conexión.</td></tr>`;
     }
 }
@@ -5432,8 +5573,8 @@ function renderDashboardView() {
                             <button onclick="cambiarMesCalendario(-1)" class="btn-icon-small"><i class="material-icons">chevron_left</i></button>
                             
                             <div style="display: flex; gap: 5px; flex-grow: 1; justify-content: center;">
-                                <select id="select-mes-cal" onchange="irAFechaSeleccionada()" class="select-calendar"></select>
-                                <select id="select-anio-cal" onchange="irAFechaSeleccionada()" class="select-calendar"></select>
+                                <select id="select-mes-cal" onchange="irAFechaSeleccionada()" class="select-calendar" style="width: 80px; font-size: 0.75rem; padding: 2px;"></select>
+                                <select id="select-anio-cal" onchange="irAFechaSeleccionada()" class="select-calendar" style="width: 60px; font-size: 0.75rem; padding: 2px;"></select>
                             </div>
 
                             <button onclick="cambiarMesCalendario(1)" class="btn-icon-small"><i class="material-icons">chevron_right</i></button>
@@ -5443,7 +5584,7 @@ function renderDashboardView() {
                             <div>DOM</div><div>LUN</div><div>MAR</div><div>MIÉ</div><div>JUE</div><div>VIE</div><div>SÁB</div>
                         </div>
 
-                        <div id="calendar-body-grid" class="calendar-grid" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 5px;">
+                        <div id="calendar-body-grid" class="calendar-grid" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; overflow: hidden;">
                             </div>
                     </div>
                 </div>
@@ -5503,15 +5644,29 @@ function renderDashboardView() {
 
 
 function renderizarGraficosDashboard(secciones) {
-    // 1. Función para agrupar alumnos por grado
+    // 1. Mapa de jerarquía para asegurar el orden pedagógico
+    const ordenGrados = {
+        'PRIMERO': 1, '1°': 1, '1RO': 1,
+        'SEGUNDO': 2, '2°': 2, '2DO': 2,
+        'TERCERO': 3, '3°': 3, '3RO': 3,
+        'CUARTO': 4,  '4°': 4, '4TO': 4,
+        'QUINTO': 5,  '5°': 5, '5TO': 5,
+        'SEXTO': 6,   '6°': 6, '6TO': 6
+    };
+
     const obtenerDatosPorNivel = (nivelStr) => {
         const agrupar = {};
         secciones.filter(s => s.nivel === nivelStr).forEach(s => {
             agrupar[s.grado] = (agrupar[s.grado] || 0) + s.alumnos;
         });
         
-        // Ordenamos las etiquetas (1°, 2°, 3°...) para que el gráfico sea coherente
-        const labels = Object.keys(agrupar).sort();
+        // --- CAMBIO CLAVE: Ordenamiento Inteligente ---
+        const labels = Object.keys(agrupar).sort((a, b) => {
+            const valA = ordenGrados[a.toUpperCase()] || 99; // 99 para grados desconocidos al final
+            const valB = ordenGrados[b.toUpperCase()] || 99;
+            return valA - valB;
+        });
+
         const data = labels.map(l => agrupar[l]);
         return { labels, data };
     };
@@ -5534,24 +5689,48 @@ function renderizarGraficosDashboard(secciones) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` Alumnos: ${context.raw}`;
+                        }
+                    }
+                }
+            },
             scales: {
-                y: { beginAtZero: true, grid: { display: false }, ticks: { stepSize: 1 } },
-                x: { grid: { display: false } }
+                y: { 
+                    beginAtZero: true, 
+                    grid: { display: false }, 
+                    ticks: { 
+                        stepSize: 1,
+                        font: { weight: 'bold' } 
+                    } 
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { font: { weight: 'bold' } }
+                }
             }
         }
     });
 
-    // 3. Destruir instancias previas para evitar errores de renderizado
-    if (chartPrimariaObj) chartPrimariaObj.destroy();
-    if (chartSecundariaObj) chartSecundariaObj.destroy();
+    // 3. Destruir instancias previas
+    if (typeof chartPrimariaObj !== 'undefined' && chartPrimariaObj) chartPrimariaObj.destroy();
+    if (typeof chartSecundariaObj !== 'undefined' && chartSecundariaObj) chartSecundariaObj.destroy();
 
     // 4. Crear los nuevos gráficos
-    const ctxPri = document.getElementById('chartPrimaria').getContext('2d');
-    const ctxSec = document.getElementById('chartSecundaria').getContext('2d');
+    const canvasPri = document.getElementById('chartPrimaria');
+    const canvasSec = document.getElementById('chartSecundaria');
 
-    chartPrimariaObj = new Chart(ctxPri, configBase(primaria.labels, primaria.data, '#06b6d4'));
-    chartSecundariaObj = new Chart(ctxSec, configBase(secundaria.labels, secundaria.data, '#8b5cf6'));
+    if (canvasPri && canvasSec) {
+        const ctxPri = canvasPri.getContext('2d');
+        const ctxSec = canvasSec.getContext('2d');
+
+        chartPrimariaObj = new Chart(ctxPri, configBase(primaria.labels, primaria.data, '#06b6d4'));
+        chartSecundariaObj = new Chart(ctxSec, configBase(secundaria.labels, secundaria.data, '#8b5cf6'));
+    }
 }
 
 // Función auxiliar para no repetir código
@@ -5732,6 +5911,8 @@ function cambiarMesCalendario(offset) {
 
 /* --- LÓGICA DE CALENDARIO MEJORADA --- */
 
+/* --- REEMPLAZA TU FUNCIÓN CON ESTA --- */
+
 function renderizarCalendario() {
     const grid = document.getElementById('calendar-body-grid');
     const selectMes = document.getElementById('select-mes-cal');
@@ -5743,7 +5924,6 @@ function renderizarCalendario() {
     const mesActual = parseInt(fechaCalendario.getMonth());
     const anioCalendario = parseInt(fechaCalendario.getFullYear());
 
-    // 1 y 2. Llenar Selectores (solo si están vacíos)
     if (selectMes.innerHTML === "") {
         selectMes.innerHTML = meses.map((m, idx) => `<option value="${idx}">${m}</option>`).join('');
     }
@@ -5764,42 +5944,55 @@ function renderizarCalendario() {
     const hoy = new Date();
     const hoyISO = hoy.toISOString().split('T')[0];
 
-    // Espacios vacíos al inicio
+    // 1. Espacios vacíos (Ajustados para no ocupar espacio extra)
     for (let i = 0; i < primerDiaMes; i++) {
         const div = document.createElement('div');
-        div.className = "calendar-day empty";
+        div.style.minHeight = "35px"; // Altura mínima controlada
         grid.appendChild(div);
     }
 
-    // Dibujar los días
+    // 2. Dibujar los días
     for (let dia = 1; dia <= ultimoDiaMes; dia++) {
         const div = document.createElement('div');
         div.className = "calendar-day";
         
-        // Formateamos la fecha del día actual en el bucle: YYYY-MM-DD
+        // --- ESTILOS CRÍTICOS PARA EVITAR DESBORDAMIENTO ---
+        div.style.display = "flex";
+        div.style.flexDirection = "column";
+        div.style.alignItems = "center";
+        div.style.justifyContent = "center";
+        div.style.padding = "2px";
+        div.style.minHeight = "38px"; // Altura fija para que no crezca el cuadro
+        div.style.position = "relative";
+        div.style.overflow = "hidden"; // Evita que los puntos se salgan
+        // ---------------------------------------------------
+        
         const mm = String(mesActual + 1).padStart(2, '0');
         const dd = String(dia).padStart(2, '0');
         const fechaISO = `${anioCalendario}-${mm}-${dd}`;
         
-        // --- NORMALIZACIÓN Y BÚSQUEDA DE EVENTOS ---
         const eventosDia = cacheEventosCalendario.filter(ev => {
             if (!ev.fecha) return false;
-            // Convertimos cualquier formato de fecha del servidor a YYYY-MM-DD
             const fechaEvFormateada = new Date(ev.fecha).toISOString().split('T')[0];
             return fechaEvFormateada === fechaISO;
         });
 
-        div.innerHTML = `<span class="day-number">${dia}</span>`;
+        // Número del día con fuente pequeña
+        div.innerHTML = `<span class="day-number" style="font-size: 0.8rem; font-weight: 600;">${dia}</span>`;
 
-        // Si hay eventos, dibujamos los puntos por categoría
         if (eventosDia.length > 0) {
             const containerPuntos = document.createElement('div');
-            containerPuntos.className = "dots-container";
+            // Estilos para que los puntos no empujen el cuadro
+            containerPuntos.style.display = "flex";
+            containerPuntos.style.gap = "2px";
+            containerPuntos.style.marginTop = "2px";
+            containerPuntos.style.justifyContent = "center";
             
-            // Creamos un puntito por cada evento (máximo 3 para no saturar)
             eventosDia.slice(0, 3).forEach(ev => {
                 const dot = document.createElement('span');
-                dot.className = "event-dot";
+                dot.style.width = "4px";
+                dot.style.height = "4px";
+                dot.style.borderRadius = "50%";
                 dot.style.backgroundColor = obtenerColorCategoria(ev.categoria);
                 containerPuntos.appendChild(dot);
             });
@@ -5810,9 +6003,10 @@ function renderizarCalendario() {
             div.onclick = () => abrirModalEvento(fechaISO);
         }
 
-        // Resaltar el día de hoy
         if (fechaISO === hoyISO) {
             div.classList.add('today');
+            div.style.backgroundColor = "#dbeafe"; // Azul muy suave para hoy
+            div.style.borderRadius = "8px";
         }
         
         grid.appendChild(div);
@@ -5954,20 +6148,30 @@ async function procesarGuardarEvento() {
 
 // 1. Función para cargar eventos desde el servidor
 async function cargarEventosDelServidor() {
-    if (!anioActivoID) return;
+    if (!anioActivoID) {
+        console.warn("⚠️ No hay un año activo seleccionado para cargar eventos.");
+        return;
+    }
     
     try {
+        // 1. Petición al servidor
         const res = await sendRequest('get_events', { idAnio: anioActivoID });
-        console.log("📅 Eventos recibidos del servidor:", res); // Esto aparecerá en tu consola (F12)
+        
+        if (res && res.status === 'success') {
+            // 2. Actualizamos la memoria local (Caché)
+            cacheEventosCalendario = res.eventos || [];
+            console.log("📅 Eventos sincronizados:", cacheEventosCalendario.length);
 
-        if (res.status === 'success') {
-            cacheEventosCalendario = res.eventos;
-            
-            // LÍNEA CRÍTICA: Redibujamos el calendario ahora que ya tenemos los datos
-            renderizarCalendario(); 
+            // 3. Verificamos si el calendario existe en el DOM antes de redibujar
+            // Esto evita errores si el usuario cambió de módulo mientras cargaba
+            const grid = document.getElementById('calendar-body-grid');
+            if (grid) {
+                renderizarCalendario();
+            }
         }
     } catch (e) {
-        console.error("Error cargando eventos:", e);
+        console.error("❌ Error crítico cargando eventos:", e);
+        lanzarNotificacion('error', 'CALENDARIO', 'No se pudo sincronizar los eventos.');
     }
 }
 
@@ -6469,4 +6673,504 @@ function imprimirListaSeccion() {
         </html>
     `);
     ventana.document.close();
+}
+
+/*-------------------------------------------------------------------*/
+/* --- AÑADIR AL MODULO DE REPORTES O CAJA EN SCRIPT.JS --- */
+
+let cacheReportePagos = {}; // Para guardar los datos descargados
+let tabReporteActual = 'REGULAR'; // 'REGULAR' o 'ADICIONAL'
+
+/* --- REEMPLAZA TU FUNCIÓN ACTUAL CON ESTA VERSIÓN ROBUSTA --- */
+
+function renderReportesPagosView() {
+    // 1. Verificar Permisos
+    if (!['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role)) {
+        lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tienes permisos para ver reportes financieros.');
+        return;
+    }
+
+    // 2. CORRECCIÓN CRÍTICA: Resetear siempre a 'REGULAR' al abrir para evitar desincronización
+    tabReporteActual = 'REGULAR'; 
+
+    const content = document.getElementById('content-area');
+    content.innerHTML = `
+        <div class="module-header">
+            <h2>Reporte de Pagos y Deudas</h2>
+            <p>Estado de cuenta por sección y concepto.</p>
+        </div>
+
+        <div class="tabs-container" style="margin-bottom: 20px; display: flex; gap: 15px;">
+            
+            <button id="btn-tab-reg" class="tab-button active" onclick="cambiarTabReporte('REGULAR')" 
+                    style="flex: 1; padding: 15px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;">
+                <i class="material-icons" style="font-size: 24px;">school</i> 
+                <span>CONCEPTOS REGULARES</span>
+            </button>
+            
+            <button id="btn-tab-adi" class="tab-button" onclick="cambiarTabReporte('ADICIONAL')" 
+                    style="flex: 1; padding: 15px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;">
+                <i class="material-icons" style="font-size: 24px;">local_activity</i> 
+                <span>CONCEPTOS ADICIONALES</span>
+            </button>
+
+        </div>
+
+        <div class="card-config" style="background:white; padding:15px; border-radius:12px; margin-bottom:20px; border-left: 4px solid #2563eb;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; align-items: flex-end;">
+                
+                <div>
+                    <label class="form-label">Año Académico</label>
+                    <select id="rep-anio" class="form-input" disabled>
+                        <option value="${anioActivoID}">${anioActivoNombre}</option>
+                    </select>
+                </div>
+                
+                <div><label class="form-label">Nivel</label><select id="rep-nivel" class="form-input" onchange="alCambiarNivelReporte()"></select></div>
+                <div><label class="form-label">Grado</label><select id="rep-grado" class="form-input" onchange="alCambiarGradoReporte()"></select></div>
+                <div><label class="form-label">Sección</label><select id="rep-seccion" class="form-input" onchange="alCambiarSeccionReporte()"></select></div>
+                
+                <div style="flex-grow: 2;">
+                    <label class="form-label" style="color:#2563eb;">Concepto a Evaluar</label>
+                    <select id="rep-concepto" class="form-input" style="font-weight:bold; border-color:#2563eb;" onchange="generarReporteDeuda()"></select>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="report-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+            <div class="dash-card" style="border-top: 4px solid #ef4444; padding:0; overflow:hidden;">
+                <div style="padding:15px; background:#fef2f2; border-bottom:1px solid #fee2e2; display:flex; justify-content:space-between;">
+                    <strong style="color:#991b1b;">PENDIENTES DE PAGO</strong>
+                    <span id="count-deuda" class="badge" style="background:#fee2e2; color:#991b1b;">0</span>
+                </div>
+                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead><tr><th>Estudiante</th><th style="text-align:right;">Deuda</th></tr></thead>
+                        <tbody id="body-deuda"><tr><td colspan="2" style="text-align:center; color:#94a3b8;">Seleccione concepto...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="dash-card" style="border-top: 4px solid #10b981; padding:0; overflow:hidden;">
+                <div style="padding:15px; background:#f0fdf4; border-bottom:1px solid #dcfce7; display:flex; justify-content:space-between;">
+                    <strong style="color:#166534;">AL DÍA (PAGADO)</strong>
+                    <span id="count-pagado" class="badge" style="background:#dcfce7; color:#166534;">0</span>
+                </div>
+                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead><tr><th>Estudiante</th><th>Recibo</th></tr></thead>
+                        <tbody id="body-pagado"><tr><td colspan="2" style="text-align:center; color:#94a3b8;">Esperando datos...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Cargar datos
+    cargarDatosInicialesReporte();
+}
+
+async function cargarDatosInicialesReporte() {
+    // 1. Cargar los niveles desde la memoria global
+    actualizarSelectsNivelGradoReporte(); 
+
+    // 2. Traer la data financiera del servidor
+    try {
+        const res = await sendRequest('get_reporte_pagos', { idAnio: anioActivoID });
+        if (res.status === 'success') {
+            cacheReportePagos = res;
+            actualizarComboConceptos(); // Llenar conceptos según la pestaña activa
+        }
+    } catch (e) { console.error(e); }
+}
+
+/* --- REEMPLAZA LA FUNCIÓN cambiarTabReporte --- */
+
+function cambiarTabReporte(tipo) {
+    // 1. Actualizar variable global
+    tabReporteActual = tipo;
+
+    // 2. Referencias a los botones
+    const btnReg = document.getElementById('btn-tab-reg');
+    const btnAdi = document.getElementById('btn-tab-adi');
+
+    // 3. Gestión visual manual (Más segura que togglear clases genéricas)
+    if (tipo === 'REGULAR') {
+        btnReg.classList.add('active');
+        btnAdi.classList.remove('active');
+    } else {
+        btnReg.classList.remove('active');
+        btnAdi.classList.add('active');
+    }
+
+    // 4. Lógica de datos
+    actualizarComboConceptos();
+    
+    // 5. Limpieza visual de tablas
+    // Es mejor limpiar los resultados al cambiar de pestaña para no confundir datos
+    limpiarResultadosReporte();
+}
+
+function actualizarComboConceptos() {
+    const select = document.getElementById('rep-concepto');
+    select.innerHTML = '<option value="">-- Seleccione --</option>';
+    
+    if (!cacheReportePagos.conceptos) return;
+
+    // Filtramos conceptos por el tipo de la pestaña actual
+    const filtrados = cacheReportePagos.conceptos.filter(c => c.tipo === tabReporteActual);
+    
+    select.innerHTML += filtrados.map(c => 
+        `<option value="${c.id}" data-monto="${c.monto}">${c.nombre} (S/ ${c.monto})</option>`
+    ).join('');
+}
+
+function generarReporteDeuda() {
+    const idSec = document.getElementById('rep-seccion').value;
+    const idCon = document.getElementById('rep-concepto').value;
+    
+    const bodyDeuda = document.getElementById('body-deuda');
+    const bodyPagado = document.getElementById('body-pagado');
+    const countDeuda = document.getElementById('count-deuda');
+    const countPagado = document.getElementById('count-pagado');
+
+    if (!idSec || !idCon) {
+        bodyDeuda.innerHTML = '<tr><td colspan="2" style="text-align:center;">Faltan filtros</td></tr>';
+        bodyPagado.innerHTML = '<tr><td colspan="2" style="text-align:center;">Faltan filtros</td></tr>';
+        return;
+    }
+
+    // 1. Obtener precio base del concepto
+    const conceptoObj = cacheReportePagos.conceptos.find(c => String(c.id) === String(idCon));
+    const precioBase = conceptoObj ? parseFloat(conceptoObj.monto) : 0;
+
+    // 2. Obtener alumnos de la sección
+    const matriculados = cacheReportePagos.matriculas.filter(m => String(m.idSec) === String(idSec));
+
+    let listaDeuda = [];
+    let listaPagado = [];
+
+    // 3. PROCESAR CADA ALUMNO
+    matriculados.forEach(mat => {
+        const est = cacheReportePagos.estudiantes.find(e => String(e.id) === String(mat.idEst));
+        if (!est) return;
+
+        // A. Calcular Descuentos
+        const misDescuentos = cacheReportePagos.descuentos
+            .filter(d => String(d.idEst) === String(mat.idEst) && String(d.idCon) === String(idCon));
+        const totalDescuento = misDescuentos.reduce((sum, d) => sum + parseFloat(d.monto), 0);
+
+        // B. Calcular Pagos Realizados
+        const misPagos = cacheReportePagos.pagos
+            .filter(p => String(p.idEst) === String(mat.idEst) && String(p.idCon) === String(idCon));
+        const totalPagado = misPagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+
+        // C. Calcular Deuda Final
+        const montoA_Pagar = precioBase - totalDescuento;
+        const deuda = montoA_Pagar - totalPagado;
+
+        const ultimoRecibo = misPagos.length > 0 ? misPagos[misPagos.length - 1].recibo : '---';
+
+        // D. Clasificar (Margen de error de 0.1 para decimales)
+        if (deuda > 0.1) {
+            listaDeuda.push({ nombre: est.nombre, deuda: deuda });
+        } else {
+            listaPagado.push({ nombre: est.nombre, recibo: misPagos.length > 1 ? 'Varios' : ultimoRecibo });
+        }
+    });
+
+    // 4. Renderizar DEUDORES
+    listaDeuda.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    countDeuda.innerText = listaDeuda.length;
+    bodyDeuda.innerHTML = listaDeuda.length ? listaDeuda.map(item => `
+        <tr>
+            <td style="font-size:12px;">${item.nombre}</td>
+            <td style="text-align:right; font-weight:bold; color:#ef4444;">S/ ${item.deuda.toFixed(2)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="2" style="text-align:center; color:#166534;"><i class="material-icons">check</i> Nadie debe</td></tr>';
+
+    // 5. Renderizar PAGADOS
+    listaPagado.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    countPagado.innerText = listaPagado.length;
+    bodyPagado.innerHTML = listaPagado.length ? listaPagado.map(item => `
+        <tr>
+            <td style="font-size:12px;">${item.nombre}</td>
+            <td style="text-align:center; font-family:monospace; color:#166534; background:#dcfce7; border-radius:4px; padding:2px;">${item.recibo}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="2" style="text-align:center; color:#94a3b8;">Nadie ha pagado</td></tr>';
+}
+
+/* FUNCIONES AUXILIARES PARA LOS SELECTS (Si no las tienes globales) */
+/* --- LOGICA DE FILTROS EN CASCADA (Usando seccionesGlobal) --- */
+
+// 1. Carga inicial de Niveles (se llama al abrir la vista)
+function actualizarSelectsNivelGradoReporte() {
+    const selectNivel = document.getElementById('rep-nivel');
+    const selectGrado = document.getElementById('rep-grado');
+    const selectSeccion = document.getElementById('rep-seccion');
+
+    // Limpieza inicial
+    selectNivel.innerHTML = '<option value="">-- Seleccione Nivel --</option>';
+    selectGrado.innerHTML = '<option value="">-- Primero Nivel --</option>';
+    selectSeccion.innerHTML = '<option value="">-- Primero Grado --</option>';
+
+    if (!seccionesGlobal || seccionesGlobal.length === 0) {
+        console.warn("No hay secciones globales cargadas.");
+        return;
+    }
+
+    // Extraer niveles únicos (Set elimina duplicados)
+    const nivelesUnicos = [...new Set(seccionesGlobal.map(s => s.nivel))];
+
+    // Llenar el combo
+    nivelesUnicos.forEach(nivel => {
+        selectNivel.innerHTML += `<option value="${nivel}">${nivel}</option>`;
+    });
+}
+
+// 2. Al cambiar Nivel -> Carga Grados
+function alCambiarNivelReporte() {
+    const nivelSel = document.getElementById('rep-nivel').value;
+    const selectGrado = document.getElementById('rep-grado');
+    const selectSeccion = document.getElementById('rep-seccion');
+
+    // Resetear hijos
+    selectGrado.innerHTML = '<option value="">-- Seleccione Grado --</option>';
+    selectSeccion.innerHTML = '<option value="">-- Primero Grado --</option>';
+    limpiarResultadosReporte(); // Borrar tablas para evitar confusión
+
+    if (!nivelSel) return;
+
+    // Filtrar grados que pertenecen a ese nivel
+    const gradosDelNivel = seccionesGlobal
+        .filter(s => s.nivel === nivelSel)
+        .map(s => s.grado);
+    
+    // Quitar duplicados
+    const gradosUnicos = [...new Set(gradosDelNivel)];
+
+    gradosUnicos.forEach(grado => {
+        selectGrado.innerHTML += `<option value="${grado}">${grado}</option>`;
+    });
+}
+
+// 3. Al cambiar Grado -> Carga Secciones (IDs reales)
+function alCambiarGradoReporte() {
+    const nivelSel = document.getElementById('rep-nivel').value;
+    const gradoSel = document.getElementById('rep-grado').value;
+    const selectSeccion = document.getElementById('rep-seccion');
+
+    // Resetear hijo
+    selectSeccion.innerHTML = '<option value="">-- Seleccione Sección --</option>';
+    limpiarResultadosReporte(); 
+
+    if (!nivelSel || !gradoSel) return;
+
+    // Filtrar secciones exactas
+    const seccionesFinales = seccionesGlobal.filter(s => s.nivel === nivelSel && s.grado === gradoSel);
+
+    seccionesFinales.forEach(sec => {
+        // Aquí el VALUE es el ID de la sección (necesario para buscar deudas)
+        selectSeccion.innerHTML += `<option value="${sec.id}">${sec.nombre}</option>`;
+    });
+}
+
+// 4. Función de limpieza visual (UX)
+function limpiarResultadosReporte() {
+    document.getElementById('body-deuda').innerHTML = '<tr><td colspan="2" style="text-align:center; color:#94a3b8;">Seleccione filtros y concepto...</td></tr>';
+    document.getElementById('body-pagado').innerHTML = '<tr><td colspan="2" style="text-align:center; color:#94a3b8;">Esperando datos...</td></tr>';
+    document.getElementById('count-deuda').innerText = '0';
+    document.getElementById('count-pagado').innerText = '0';
+}
+
+/* --- AGREGAR A SCRIPT.JS --- */
+// 1. Función disparadora al seleccionar una sección
+function alCambiarSeccionReporte() {
+    limpiarResultadosReporte(); // Borra la tabla de deudores antigua
+    actualizarComboConceptos(); // Carga los conceptos específicos de esta sección
+}
+
+// 2. Función de filtrado actualizada
+/* --- EN SCRIPT.JS --- */
+
+function actualizarComboConceptos() {
+    const select = document.getElementById('rep-concepto');
+    
+    // Capturamos el ID de la sección seleccionada y lo limpiamos (sin espacios)
+    const idSecValor = document.getElementById('rep-seccion').value;
+    const idSec = idSecValor ? String(idSecValor).trim() : "";
+
+    select.innerHTML = '<option value="">-- Seleccione Concepto --</option>';
+    
+    // Seguridad: Si no hay datos o no hay sección seleccionada, paramos.
+    if (!cacheReportePagos.conceptos || !idSec) {
+        console.log("Esperando selección de sección...");
+        return;
+    }
+
+    const filtrados = cacheReportePagos.conceptos.filter(c => {
+        // 1. FILTRO POR TIPO (Pestaña) - Comparación insensible a mayúsculas/minúsculas
+        const tipoConcepto = (c.tipo || "").trim().toUpperCase();
+        const tipoPestaña = (tabReporteActual || "").trim().toUpperCase();
+        
+        if (tipoConcepto !== tipoPestaña) return false;
+
+        // 2. FILTRO POR ID SECCIÓN (Estricto)
+        // Convertimos la celda "ID1, ID2, ID3" en un array limpio
+        const stringIds = String(c.idsSecciones || "");
+        
+        // Separamos por coma y limpiamos cada ID individualmente
+        const arrayIds = stringIds.split(',').map(id => id.trim());
+        
+        // Verificamos si el ID de MI sección está en esa lista
+        return arrayIds.includes(idSec);
+    });
+    
+    // Debug para que verifiques en consola si sigue fallando
+    console.log(`Filtro aplicado: Sección [${idSec}] | Pestaña [${tabReporteActual}] | Encontrados: ${filtrados.length}`);
+
+    if (filtrados.length > 0) {
+        select.innerHTML += filtrados.map(c => 
+            `<option value="${c.id}" data-monto="${c.monto}">${c.nombre} (S/ ${c.monto})</option>`
+        ).join('');
+    } else {
+        select.innerHTML = '<option value="">-- Sin conceptos para esta sección --</option>';
+    }
+}
+
+
+/*------DESCARGAR TICKET PDF------------------*/
+function descargarTicketPDF(datosBorrador, nroRecibo) {
+    lanzarNotificacion('loading', 'PDF', 'Generando archivo...');
+
+    // 1. Datos Generales
+    // Si datosBorrador[0].fecha existe (viene del buscador), la usamos.
+    // Si no existe (es un recibo nuevo), generamos la fecha actual.
+    const fechaEmision = datosBorrador[0].fecha && datosBorrador[0].fecha !== "---" 
+        ? datosBorrador[0].fecha 
+        : new Date().toLocaleString('es-PE', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+    // -----------------------
+    const medioDigital = datosBorrador[0].medio;
+    const codOp = datosBorrador[0].codOp;
+    const obs = datosBorrador[0].obs;
+    const granTotal = datosBorrador.reduce((sum, it) => sum + parseFloat(it.totalInd), 0);
+    const logoUrl = 'https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png';
+
+    // 2. Construir el Contenedor
+    const element = document.createElement('div');
+    element.style.width = '260px'; 
+    element.style.fontFamily = "'Courier New', Courier, monospace";
+    element.style.fontSize = '11px';
+    element.style.padding = '15px';
+    element.style.color = '#000';
+    element.style.backgroundColor = '#fff';
+
+    let htmlContent = `
+        <div style="text-align: center;">
+            <img src="${logoUrl}" crossorigin="anonymous" width="60" style="filter: grayscale(1); display: block; margin: 0 auto;"><br>
+            <strong style="font-size: 12px;">I.E.P. Ciencias Aplicadas<br>Sir Isaac Newton</strong><br>
+            <strong>RUC: 20455855226</strong><br>
+            <span style="font-size: 9px;">Calle Aurelio de la Fuente N° 102-104</span><br>
+            <div style="border-bottom: 1px dashed #000; margin: 5px 0;"></div>
+            <strong style="font-size: 13px;">RECIBO N° ${nroRecibo}</strong><br>
+            <span>Emisión: ${fechaEmision}</span>
+        </div>
+        <div style="border-bottom: 1px dashed #000; margin: 5px 0;"></div>
+        <div style="font-weight: bold; margin-bottom: 8px;">DETALLE DE PAGO:</div>
+    `;
+
+    datosBorrador.forEach((it, idx) => {
+        // --- LÓGICA DE CÁLCULO DE RETRASO ---
+        let textoEstado = "";
+        if (it.fechaProg) {
+            const fechaProg = new Date(it.fechaProg);
+            const hoy = new Date();
+            
+            // Normalizar a medianoche
+            hoy.setHours(0,0,0,0);
+            fechaProg.setHours(0,0,0,0);
+            
+            if (!isNaN(fechaProg.getTime())) {
+                const diffTime = hoy - fechaProg;
+                const diasAtraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diasAtraso > 0) {
+                    textoEstado = `<div style="font-weight:bold;">Días de retraso: ${diasAtraso}</div>`;
+                } else {
+                    textoEstado = `<div style="font-style:italic;">Pago puntual.</div>`;
+                }
+            }
+        }
+
+        const saldoRestante = (it.saldoPrevio || 0) - parseFloat(it.totalInd);
+        const bloqueSaldo = (it.tipo !== 'EXCEPCIONAL') ? `
+            <div style="font-size: 9px; margin-top: 2px;">SALDO PEND: S/ ${saldoRestante.toFixed(2)}</div>` : '';
+
+        htmlContent += `
+        <div style="margin-bottom: 10px;">
+            <div style="font-weight:bold;">${idx + 1}. ${it.nombre}</div>
+            <div style="padding-left: 5px; font-size: 10px;">
+                > ${it.nomCon}<br>
+                <span>Pagado: S/ ${parseFloat(it.totalInd).toFixed(2)}</span>
+                <div style="border-left: 2px solid #000; padding-left: 5px; margin-top:2px; font-size: 9px;">
+                   ${bloqueSaldo}
+                   ${textoEstado}
+                </div>
+            </div>
+        </div>`;
+    });
+
+    htmlContent += `
+        <div style="border-bottom: 3px double #000; margin: 5px 0;"></div>
+        <div style="text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px;">
+            TOTAL: S/ ${granTotal.toFixed(2)}
+        </div>
+    `;
+
+    if (medioDigital && medioDigital.trim() !== "") {
+        htmlContent += `
+        <div style="margin-top: 10px; font-size: 9px; background: #eee; padding: 5px;">
+            <strong>M. DIGITAL:</strong> ${medioDigital}<br>
+            <strong>CÓD. OP:</strong> ${codOp}
+        </div>`;
+    }
+
+    if (obs) {
+        htmlContent += `<div style="margin-top: 8px; font-size: 9px;"><strong>OBS:</strong> ${obs}</div>`;
+    }
+
+    htmlContent += `
+        <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+        <div style="text-align: center; font-size: 10px; margin-top: 10px;">
+            ¡Gracias por su confianza!<br>
+            <span style="font-size: 8px;">Copia digital generada por sistema.</span>
+        </div>
+    `;
+
+    element.innerHTML = htmlContent;
+
+    // 3. Configuración y Generación
+    const opt = {
+        margin:       [10, 5],
+        filename:     `Recibo-${nroRecibo}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 3, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: [80, 250], orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        cerrarNotify();
+        lanzarNotificacion('success', 'PDF GENERADO', 'Se descargó el archivo correctamente.');
+    }).catch(err => {
+        console.error(err);
+        cerrarNotify();
+        lanzarNotificacion('error', 'ERROR', 'Fallo al generar PDF.');
+    });
 }

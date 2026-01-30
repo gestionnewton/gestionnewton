@@ -8,10 +8,10 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" type="image/png" href="https://i.postimg.cc/q7KnSYVv/insignia_blanca.png">
-    <link rel="icon" sizes="192x192" href="https://i.postimg.cc/nzxVbN3W/icono-newton-(1).jpg">
-    <link rel="icon" sizes="512x512" href="https://i.postimg.cc/nzxVbN3W/icono-newton-(1).jpg">
+    <link rel="icon" sizes="192x192" href="https://i.postimg.cc/K4Sgd0g4/insignia-azul-borde-blanco.png">
+    <link rel="icon" sizes="512x512" href="https://i.postimg.cc/K4Sgd0g4/insignia-azul-borde-blanco.png">
     
-    <link rel="apple-touch-icon" href="https://i.postimg.cc/R0D1gQGJ/favicon-azul-Con-Blanco.png">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/K4Sgd0g4/insignia-azul-borde-blanco.png">
     
     <meta name="theme-color" content="#2563eb"> 
     
@@ -62,18 +62,20 @@
                     <i class="material-icons">receipt</i> Nuevo Recibo
                 </a>
 
-                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO">
                     <button class="dropdown-btn">
                         <span><i class="material-icons">monetization_on</i> Pagos</span>
                         <i class="material-icons arrow">expand_more</i>
                     </button>
                     <div class="dropdown-content">
                         <a href="#" data-roles="ADMINISTRADOR" onclick="loadView('conceptos', this)">Conceptos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('descuentos', this)">Descuentos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('recibos', this)">Recibos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('historial-pagos', this)">Historial de pagos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('egresos', this)">Egresos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA" onclick="loadView('caja-diaria', this)">Caja</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('descuentos', this)">Descuentos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('recibos', this)">Recibos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('historial-pagos', this)">Historial de pagos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('egresos', this)">Egresos</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('caja-diaria', this)">Caja</a>
+                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('reportes_pagos', this)">Reportes</a>
+
                     </div>
                 </div>
 
@@ -156,15 +158,7 @@
 
 
     <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 </body>
-
 </html>
-
-
-
-
-
-
-
-
