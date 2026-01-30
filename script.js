@@ -5833,36 +5833,35 @@ function abrirModalEvento(fecha) {
     modalTitle.innerText = "Registrar Evento: " + fecha;
     
     modalBody.innerHTML = `
-        <form id="form-evento" style="display: flex; flex-direction: column; gap: 15px; padding: 10px;">
+        <form id="form-evento" class="fade-in" style="display: flex; flex-direction: column; gap: 15px; padding: 10px;">
             <input type="hidden" id="event-fecha" value="${fecha}">
             
             <div class="form-group">
-                <label>Título del Evento</label>
+                <label class="form-label">Título del Evento</label>
                 <input type="text" id="event-titulo" placeholder="Ej: Reunión de Padres" required class="form-input">
             </div>
 
             <div class="form-group">
-                <label>Categoría</label>
-                <select id="event-categoria" class="form-input">
-                    <option value="General">General</option>
-                    <option value="PP.FF.">PP.FF.</option>
-                    <option value="Estudiantes">Estudiantes</option>
-                    <option value="Personal Laboral">Personal Laboral</option>
+                <label class="form-label">Categoría</label>
+                <select id="event-categoria" class="form-input" style="cursor: pointer;">
+                    <option value="General">🌐 General</option>
+                    <option value="PP.FF.">👨‍👩‍👧‍👦 PP.FF.</option>
+                    <option value="Estudiantes">🎓 Estudiantes</option>
+                    <option value="Personal Laboral">💼 Personal Laboral</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label>Descripción</label>
-                <textarea id="event-descripcion" rows="3" placeholder="Detalles del evento..." class="form-input" style="resize:none;"></textarea>
+                <label class="form-label">Descripción</label>
+                <textarea id="event-descripcion" rows="3" placeholder="Escribe aquí los detalles..." class="form-input" style="resize:none; padding-top: 10px;"></textarea>
             </div>
 
-            <button type="button" onclick="procesarGuardarEvento()" class="btn-primary" style="width: 100%;">
+            <button type="button" onclick="procesarGuardarEvento()" class="btn-primary" style="width: 100%; margin-top: 5px;">
                 <i class="material-icons">save</i> GUARDAR EVENTO
             </button>
         </form>
     `;
     
-    // Abrir el modal (asumiendo que tienes una función abrirModal)
     document.getElementById('modal-global').style.display = 'flex';
 }
 
@@ -5968,26 +5967,60 @@ function mostrarDetalleEventos(eventos, fecha) {
 }
 
 
+// Paso 1: Mostrar confirmación con estilo WebApp
 function confirmarEliminarEvento(id, titulo) {
-    if (confirm(`¿Estás seguro de eliminar el evento: "${titulo}"?`)) {
-        procesarEliminarEvento(id);
-    }
+    const modalBody = document.getElementById('modal-body');
+    const modalTitle = document.getElementById('modal-title');
+    
+    modalTitle.innerText = "Confirmar Eliminación";
+    
+    modalBody.innerHTML = `
+        <div class="fade-in" style="text-align: center; padding: 20px;">
+            <div style="background: #fee2e2; color: #ef4444; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px;">
+                <i class="material-icons" style="font-size: 35px;">delete_forever</i>
+            </div>
+            <p style="color: #1e293b; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">¿Eliminar este evento?</p>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">"${titulo}"</p>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="cerrarModal()" class="btn-secondary" style="flex: 1;">CANCELAR</button>
+                <button id="btn-eliminar-confirm" onclick="procesarEliminarEvento('${id}')" class="btn-primary" style="flex: 1; background: #ef4444;">
+                    ELIMINAR AHORA
+                </button>
+            </div>
+        </div>
+    `;
 }
 
+// Paso 2: Procesar con animación de carga
 async function procesarEliminarEvento(id) {
+    const btn = document.getElementById('btn-eliminar-confirm');
+    
     try {
+        // Activamos animación de carga en el botón
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons rotate">sync</i> ELIMINANDO...';
+
         const res = await sendRequest('delete_event', { id: id });
+        
         if (res.status === 'success') {
-            lanzarNotificacion('success', 'ELIMINADO', res.message);
+            lanzarNotificacion('success', 'ELIMINADO', 'El evento ha sido borrado.');
             cerrarModal();
-            // Actualizamos todo simultáneamente
-            actualizarCacheDashboardSilencioso();
+            // Actualización silenciosa de los datos y el calendario
+            await cargarEventosDelServidor(); 
+            if (typeof actualizarCacheDashboardSilencioso === 'function') {
+                actualizarCacheDashboardSilencioso();
+            }
         } else {
             lanzarNotificacion('error', 'ERROR', res.message);
+            btn.disabled = false;
+            btn.innerHTML = 'ELIMINAR AHORA';
         }
     } catch (e) {
         console.error(e);
-        lanzarNotificacion('error', 'SISTEMA', 'No se pudo eliminar el evento.');
+        lanzarNotificacion('error', 'SISTEMA', 'No se pudo conectar con el servidor.');
+        btn.disabled = false;
+        btn.innerHTML = 'ELIMINAR AHORA';
     }
 }
 
