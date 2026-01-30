@@ -6245,10 +6245,9 @@ function imprimirListaSeccion() {
     const grado = comboGrado.options[comboGrado.selectedIndex]?.text || '';
     const seccion = comboSeccion.options[comboSeccion.selectedIndex]?.text || '';
 
-    // 2. Capturar y PROCESAR filas de estudiantes
+    // 2. Capturar filas
     const filasRaw = document.querySelectorAll('#body-lista-seccion tr');
     
-    // Validación
     if (filasRaw.length === 0 || filasRaw[0].innerText.includes('Seleccione') || filasRaw[0].innerText.includes('No se encontraron')) {
         lanzarNotificacion('error', 'SIN DATOS', 'Primero carga una lista de estudiantes para imprimir.');
         return;
@@ -6259,43 +6258,42 @@ function imprimirListaSeccion() {
     filasRaw.forEach(tr => {
         const tds = tr.querySelectorAll('td');
         if (tds.length > 2) { 
-            // Extraemos los datos para poder ordenarlos
             estudiantes.push({
-                dni: tds[1].innerText.trim(),
-                nombre: tds[2].innerText.trim()
+                // Solo necesitamos el nombre para ordenar e imprimir
+                nombre: tds[2].innerText.trim() 
             });
         }
     });
 
-    // Ordenar alfabéticamente por Nombre (Apellido va primero usualmente)
+    // Ordenar alfabéticamente (A-Z)
     estudiantes.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-    // 3. Configuración de columnas vacías
-    // Para vertical (A4), 8 columnas vacías es un buen balance para que el nombre tenga espacio
-    const numColumnasVacias = 8; 
+    // 3. Configuración de columnas (SIN DNI -> MÁS ESPACIO)
+    // Aumentamos a 12 columnas (Ideal para asistencia de 2 semanas o muchas notas)
+    const numColumnasVacias = 12; 
     let thVacios = '';
     let tdVacios = '';
 
     for(let i=0; i<numColumnasVacias; i++) {
-        thVacios += `<th class="casillero"></th>`; // Encabezado vacío
-        tdVacios += `<td class="casillero"></td>`; // Celda vacía
+        // Encabezado vacío (con borde para que el profesor escriba la fecha o criterio)
+        thVacios += `<th class="casillero"></th>`; 
+        tdVacios += `<td class="casillero"></td>`; 
     }
 
-    // 4. Construir filas HTML ya ordenadas
+    // 4. Construir filas HTML
     let filasHTML = '';
     
     estudiantes.forEach((est, index) => {
         filasHTML += `
             <tr>
-                <td style="text-align:center;">${index + 1}</td>
+                <td class="col-nro">${index + 1}</td>
                 <td class="col-nombre">${est.nombre}</td>
-                <td style="text-align:center;">${est.dni}</td>
                 ${tdVacios}
             </tr>
         `;
     });
 
-    // 5. Generar PDF Vertical
+    // 5. Generar PDF Vertical Optimizado
     const ventana = window.open('', '_blank');
     ventana.document.write(`
         <html>
@@ -6318,7 +6316,7 @@ function imprimirListaSeccion() {
                     justify-content: space-between;
                     align-items: center;
                     border-bottom: 2px solid #2563eb;
-                    padding-bottom: 8px;
+                    padding-bottom: 5px;
                     margin-bottom: 10px;
                 }
                 .titulo-principal {
@@ -6326,18 +6324,17 @@ function imprimirListaSeccion() {
                     font-weight: 700;
                     color: #1e3a8a;
                     margin: 0;
-                    text-transform: uppercase;
                 }
-                .subtitulo { font-size: 11px; color: #64748b; margin: 0; }
+                .subtitulo { font-size: 10px; color: #64748b; margin: 0; }
 
                 /* CAJA DE DATOS */
                 .info-box {
                     background-color: #eff6ff; 
                     border: 1px solid #bfdbfe;
                     border-radius: 4px;
-                    padding: 8px;
+                    padding: 6px 10px;
                     display: flex;
-                    justify-content: space-between; /* Distribuye mejor en vertical */
+                    justify-content: space-between;
                     font-weight: bold;
                     color: #1e40af;
                     margin-bottom: 10px;
@@ -6348,48 +6345,54 @@ function imprimirListaSeccion() {
                 table { 
                     width: 100%; 
                     border-collapse: collapse; 
-                    table-layout: fixed; /* Importante para respetar anchos */
+                    table-layout: fixed; 
                 }
                 
                 th {
                     background-color: #2563eb; 
                     color: white;
-                    padding: 6px 2px;
+                    padding: 4px 2px;
                     border: 1px solid #1e40af;
                     font-weight: 600;
                     font-size: 9px;
                     text-align: center;
-                    overflow: hidden;
+                    height: 20px; /* Espacio para escribir fecha en el encabezado */
                 }
 
                 td {
-                    border: 1px solid #94a3b8; /* Borde un poco más visible para escribir */
-                    padding: 4px 4px;
+                    border: 1px solid #94a3b8; /* Borde visible para guiar la escritura */
+                    padding: 3px 5px;
                     font-size: 10px;
-                    height: 18px; /* Altura fija para que sea cómodo escribir a mano */
+                    height: 18px; 
                 }
 
-                /* ESTILOS DE COLUMNAS PARA VERTICAL */
-                .col-nro { width: 4%; text-align: center; font-weight: bold; background: #f1f5f9; }
-                .col-dni { width: 10%; text-align: center; }
+                /* ANCHOS DE COLUMNAS (Total 100%) */
+                .col-nro { 
+                    width: 4%; 
+                    text-align: center; 
+                    background: #f1f5f9; 
+                    font-weight: bold;
+                }
+                
                 .col-nombre { 
-                    width: 40%; /* 40% para el nombre es ideal en vertical */
+                    width: 36%; /* Espacio suficiente para apellidos largos */
                     text-align: left;
-                    padding-left: 8px;
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis; 
-                    text-transform: uppercase; /* Nombres en mayúsculas se ven mejor */
+                    text-transform: uppercase;
                 }
-                /* El resto (46%) se divide entre las 8 columnas vacías */
 
-                /* EFECTO CEBRA */
+                /* El 60% restante se divide entre las 12 columnas vacías (5% c/u) */
+                .casillero { width: 5%; }
+
+                /* EFECTO CEBRA SUAVE */
                 tr:nth-child(even) { background-color: #f8fafc; }
 
                 @media print {
                     @page { 
-                        size: A4 portrait; /* VERTICAL */
-                        margin: 10mm; 
+                        size: A4 portrait; 
+                        margin: 8mm 10mm; /* Márgenes ajustados para aprovechar la hoja */
                     }
                     body { -webkit-print-color-adjust: exact; }
                 }
@@ -6398,11 +6401,11 @@ function imprimirListaSeccion() {
         <body>
             <div class="header-container">
                 <div>
-                    <h1 class="titulo-principal">I. E. P. NEWTON SCHOOL</h1>
+                    <h1 class="titulo-principal">I.E.P. NEWTON SCHOOL</h1>
                     <p class="subtitulo">Registro Auxiliar de Evaluación y Asistencia</p>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:12px; font-weight:bold; color:#1e3a8a;">${grado} - ${seccion}</div>
+                    <div style="font-size:12px; font-weight:bold; color:#1e3a8a;">${grado} "${seccion}"</div>
                     <div style="font-size:9px;">${new Date().toLocaleDateString()}</div>
                 </div>
             </div>
@@ -6410,7 +6413,7 @@ function imprimirListaSeccion() {
             <div class="info-box">
                 <span>AÑO: ${anio}</span>
                 <span>NIVEL: ${nivel}</span>
-                <span>TOTAL EST: ${estudiantes.length}</span>
+                <span>TOTAL ESTUDIANTES: ${estudiantes.length}</span>
             </div>
 
             <table>
@@ -6418,7 +6421,6 @@ function imprimirListaSeccion() {
                     <tr>
                         <th class="col-nro">N°</th>
                         <th class="col-nombre">APELLIDOS Y NOMBRES</th>
-                        <th class="col-dni">DNI</th>
                         ${thVacios}
                     </tr>
                 </thead>
