@@ -6232,112 +6232,186 @@ async function enviarSolicitudAcceso(idRecibido) {
 
 /*------------------------------------------------------------------------*/
 /* --- FUNCIÓN PARA GENERAR REPORTE A4 --- */
+
 function imprimirListaSeccion() {
     // 1. Capturar datos de encabezado
-    const anio = document.getElementById('con-anio').options[document.getElementById('con-anio').selectedIndex]?.text;
-    const nivel = document.getElementById('con-nivel').options[document.getElementById('con-nivel').selectedIndex]?.text;
-    const grado = document.getElementById('con-grado').options[document.getElementById('con-grado').selectedIndex]?.text;
-    const seccion = document.getElementById('con-seccion').options[document.getElementById('con-seccion').selectedIndex]?.text;
+    const comboAnio = document.getElementById('con-anio');
+    const comboNivel = document.getElementById('con-nivel');
+    const comboGrado = document.getElementById('con-grado');
+    const comboSeccion = document.getElementById('con-seccion');
+
+    const anio = comboAnio.options[comboAnio.selectedIndex]?.text || '';
+    const nivel = comboNivel.options[comboNivel.selectedIndex]?.text || '';
+    const grado = comboGrado.options[comboGrado.selectedIndex]?.text || '';
+    const seccion = comboSeccion.options[comboSeccion.selectedIndex]?.text || '';
 
     // 2. Capturar filas de estudiantes
     const filas = document.querySelectorAll('#body-lista-seccion tr');
     
-    // Validación: Si no hay datos o dice "Seleccione filtros..."
+    // Validación básica
     if (filas.length === 0 || filas[0].innerText.includes('Seleccione') || filas[0].innerText.includes('No se encontraron')) {
         lanzarNotificacion('error', 'SIN DATOS', 'Primero carga una lista de estudiantes para imprimir.');
         return;
     }
 
-    // 3. Construir filas para el reporte
+    // 3. Configuración de columnas vacías (Aumentamos la cantidad)
+    const numColumnasVacias = 10; // Ahora hay 10 casilleros para notas/asistencia
+    let thVacios = '';
+    let tdVacios = '';
+
+    for(let i=0; i<numColumnasVacias; i++) {
+        thVacios += `<th class="casillero"></th>`;
+        tdVacios += `<td class="casillero"></td>`;
+    }
+
+    // 4. Construir filas HTML
     let filasHTML = '';
     let contador = 1;
 
     filas.forEach(tr => {
+        // Asumiendo que la columna 1 es DNI y la 2 es Nombres (según tu tabla original)
+        // Ajusta los índices [1] y [2] si tu tabla tiene otro orden
         const tds = tr.querySelectorAll('td');
-        if (tds.length > 2) { // Asegurar que es una fila de datos real
+        
+        if (tds.length > 2) { 
             const dni = tds[1].innerText;
             const nombre = tds[2].innerText;
             
             filasHTML += `
                 <tr>
                     <td style="text-align:center;">${contador++}</td>
-                    <td>${nombre}</td>
-                    <td style="text-align:center;">${dni}</td>
-                    <td class="casillero"></td>
-                    <td class="casillero"></td>
-                    <td class="casillero"></td>
-                    <td class="casillero"></td>
-                    <td class="casillero"></td>
-                    <td class="casillero"></td>
+                    <td class="col-nombre">${nombre}</td> <td style="text-align:center;">${dni}</td>
+                    ${tdVacios}
                 </tr>
             `;
         }
     });
 
-    // 4. Generar la ventana de impresión
+    // 5. Generar PDF
     const ventana = window.open('', '_blank');
     ventana.document.write(`
         <html>
         <head>
-            <title>Lista de Clase - ${grado} ${seccion}</title>
+            <title>Lista ${grado} ${seccion} - Newton</title>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; font-size: 12px; }
-                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; }
-                .header p { margin: 5px 0; font-size: 14px; }
-                .info-box { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; background: #f1f5f9; padding: 10px; border-radius: 5px; border: 1px solid #cbd5e1; }
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
                 
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #333; padding: 6px; }
-                th { background-color: #e2e8f0; text-transform: uppercase; font-size: 10px; }
+                body { 
+                    font-family: 'Roboto', sans-serif; 
+                    padding: 20px; 
+                    font-size: 11px; /* Letra un poco más pequeña para que entre todo */
+                    color: #1e293b;
+                }
                 
-                /* Estilo de los casilleros vacíos */
-                .casillero { width: 30px; } 
+                /* CABECERA ESTILO NEWTON */
+                .header-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 2px solid #2563eb;
+                    padding-bottom: 10px;
+                    margin-bottom: 15px;
+                }
+                .titulo-principal {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #1e3a8a; /* Azul oscuro */
+                    margin: 0;
+                }
+                .subtitulo {
+                    font-size: 12px;
+                    color: #64748b;
+                    margin: 2px 0 0 0;
+                }
+
+                /* CAJA DE DATOS */
+                .info-box {
+                    background-color: #eff6ff; /* Celeste muy claro */
+                    border: 1px solid #bfdbfe;
+                    border-radius: 6px;
+                    padding: 10px 15px;
+                    display: flex;
+                    justify-content: space-around;
+                    font-weight: bold;
+                    color: #1e40af;
+                    margin-bottom: 15px;
+                    font-size: 12px;
+                }
+
+                /* TABLA AZUL */
+                table { width: 100%; border-collapse: collapse; }
+                
+                th {
+                    background-color: #2563eb; /* Azul Newton */
+                    color: white;
+                    padding: 8px 4px;
+                    border: 1px solid #1d4ed8;
+                    font-weight: 600;
+                    font-size: 10px;
+                    text-transform: uppercase;
+                }
+
+                td {
+                    border: 1px solid #cbd5e1;
+                    padding: 4px 6px;
+                    font-size: 11px;
+                }
+
+                /* EFECTO CEBRA EN AZUL */
+                tr:nth-child(even) { background-color: #f8fafc; }
+                tr:hover { background-color: #e0f2fe; }
+
+                /* CONTROL DE ANCHOS */
+                .col-nro { width: 3%; }
+                .col-nombre { 
+                    width: 35%; /* Ancho reducido para nombres */
+                    white-space: nowrap; 
+                    overflow: hidden; 
+                    text-overflow: ellipsis; 
+                }
+                .col-dni { width: 8%; }
+                .casillero { width: auto; } /* El resto se reparte equitativamente */
 
                 @media print {
-                    @page { size: A4; margin: 10mm; }
+                    @page { size: A4 landscape; margin: 10mm; } /* Horizontal para más espacio */
                     body { -webkit-print-color-adjust: exact; }
-                    .no-print { display: none; }
                 }
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>Institución Educativa NEWTON</h1>
-                <p>Reporte de Matrícula y Asistencia</p>
+            <div class="header-container">
+                <div>
+                    <h1 class="titulo-principal">I.E. NEWTON</h1>
+                    <p class="subtitulo">Sistema de Gestión Académica</p>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:14px; font-weight:bold; color:#1e3a8a;">LISTA DE CLASE</div>
+                    <div style="font-size:10px;">${new Date().toLocaleDateString()}</div>
+                </div>
             </div>
 
             <div class="info-box">
-                <span>AÑO: ${anio}</span>
-                <span>NIVEL: ${nivel}</span>
-                <span>GRADO: ${grado}</span>
-                <span>SECCIÓN: ${seccion}</span>
+                <span>${anio}</span>
+                <span>${nivel}</span>
+                <span>${grado}</span>
+                <span>${seccion}</span>
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 30px;">N°</th>
-                        <th>APELLIDOS Y NOMBRES</th>
-                        <th style="width: 70px;">DNI</th>
-                        <th class="casillero"></th>
-                        <th class="casillero"></th>
-                        <th class="casillero"></th>
-                        <th class="casillero"></th>
-                        <th class="casillero"></th>
-                        <th class="casillero"></th>
-                    </tr>
+                        <th class="col-nro">N°</th>
+                        <th class="col-nombre">APELLIDOS Y NOMBRES</th>
+                        <th class="col-dni">DNI</th>
+                        ${thVacios} </tr>
                 </thead>
                 <tbody>
                     ${filasHTML}
                 </tbody>
             </table>
-
-            <div style="margin-top: 30px; text-align: right; font-size: 10px; color: #64748b;">
-                Generado el: ${new Date().toLocaleString()}
-            </div>
             
             <script>
+                // Imprimir automáticamente al cargar
                 window.onload = function() { window.print(); }
             </script>
         </body>
