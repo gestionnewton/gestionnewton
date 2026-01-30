@@ -4717,7 +4717,7 @@ async function cargarTablaHistorial() {
                         <td>${item.codOp || '---'}</td>
                         <td style="text-align: right; font-weight: bold; color: #1e293b;">S/ ${item.total.toFixed(2)}</td>
                         <td style="text-align: center;">
-                            <button class="btn-icon view" onclick="verDetallePagoHistorial(${index}, '${JSON.stringify(item).replace(/'/g, "&#39;")}')">
+                            <button class="btn-icon view" onclick="verDetallePagoHistorial(${index}, title="Ver Detalle">
                                 <i class="material-icons">visibility</i>
                             </button>
                         </td>
@@ -4740,7 +4740,7 @@ async function cargarTablaHistorial() {
 
 //
 // --- MODAL DE DETALLE DEL RECIBO ---HISTORIAL
-function verDetallePago(index) {
+function verDetallePagoHistorial(index) {
     const data = historialCache[index];
     if (!data) return;
 
