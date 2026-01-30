@@ -5900,6 +5900,8 @@ async function procesarGuardarEvento() {
         if (res && res.status === 'success') {
             lanzarNotificacion('success', 'REGISTRADO', res.message);
             cerrarModal();
+            // CAMBIO CLAVE: Primero descargamos los eventos nuevos, luego redibujamos
+            await cargarEventosDelServidor();
             // Refrescamos el calendario para Etapa 3
             renderizarCalendario();
         } else {
