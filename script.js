@@ -4655,6 +4655,7 @@ async function cargarTablaHistorial() {
         if (res.status === 'success') {
             const pagos = res.pagos || [];
             const deudas = res.pendientes || [];
+            historialCache = pagos;
 
             document.getElementById('hist-count').innerText = `${pagos.length} Pagos | ${deudas.length} Pendientes`;
 
@@ -4717,7 +4718,7 @@ async function cargarTablaHistorial() {
                         <td>${item.codOp || '---'}</td>
                         <td style="text-align: right; font-weight: bold; color: #1e293b;">S/ ${item.total.toFixed(2)}</td>
                         <td style="text-align: center;">
-                            <button class="btn-icon view" onclick="verDetallePagoHistorial(${index}, title="Ver Detalle">
+                            <button class="btn-icon view" onclick="verDetallePagoHistorial(${index})" title="Ver Detalle">
                                 <i class="material-icons">visibility</i>
                             </button>
                         </td>
