@@ -6245,135 +6245,152 @@ function imprimirListaSeccion() {
     const grado = comboGrado.options[comboGrado.selectedIndex]?.text || '';
     const seccion = comboSeccion.options[comboSeccion.selectedIndex]?.text || '';
 
-    // 2. Capturar filas de estudiantes
-    const filas = document.querySelectorAll('#body-lista-seccion tr');
+    // 2. Capturar y PROCESAR filas de estudiantes
+    const filasRaw = document.querySelectorAll('#body-lista-seccion tr');
     
-    // Validación básica
-    if (filas.length === 0 || filas[0].innerText.includes('Seleccione') || filas[0].innerText.includes('No se encontraron')) {
+    // Validación
+    if (filasRaw.length === 0 || filasRaw[0].innerText.includes('Seleccione') || filasRaw[0].innerText.includes('No se encontraron')) {
         lanzarNotificacion('error', 'SIN DATOS', 'Primero carga una lista de estudiantes para imprimir.');
         return;
     }
 
-    // 3. Configuración de columnas vacías (Aumentamos la cantidad)
-    const numColumnasVacias = 10; // Ahora hay 10 casilleros para notas/asistencia
+    // --- LÓGICA DE ORDENAMIENTO ---
+    let estudiantes = [];
+    filasRaw.forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length > 2) { 
+            // Extraemos los datos para poder ordenarlos
+            estudiantes.push({
+                dni: tds[1].innerText.trim(),
+                nombre: tds[2].innerText.trim()
+            });
+        }
+    });
+
+    // Ordenar alfabéticamente por Nombre (Apellido va primero usualmente)
+    estudiantes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    // 3. Configuración de columnas vacías
+    // Para vertical (A4), 8 columnas vacías es un buen balance para que el nombre tenga espacio
+    const numColumnasVacias = 8; 
     let thVacios = '';
     let tdVacios = '';
 
     for(let i=0; i<numColumnasVacias; i++) {
-        thVacios += `<th class="casillero"></th>`;
-        tdVacios += `<td class="casillero"></td>`;
+        thVacios += `<th class="casillero"></th>`; // Encabezado vacío
+        tdVacios += `<td class="casillero"></td>`; // Celda vacía
     }
 
-    // 4. Construir filas HTML
+    // 4. Construir filas HTML ya ordenadas
     let filasHTML = '';
-    let contador = 1;
-
-    filas.forEach(tr => {
-        // Asumiendo que la columna 1 es DNI y la 2 es Nombres (según tu tabla original)
-        // Ajusta los índices [1] y [2] si tu tabla tiene otro orden
-        const tds = tr.querySelectorAll('td');
-        
-        if (tds.length > 2) { 
-            const dni = tds[1].innerText;
-            const nombre = tds[2].innerText;
-            
-            filasHTML += `
-                <tr>
-                    <td style="text-align:center;">${contador++}</td>
-                    <td class="col-nombre">${nombre}</td> <td style="text-align:center;">${dni}</td>
-                    ${tdVacios}
-                </tr>
-            `;
-        }
+    
+    estudiantes.forEach((est, index) => {
+        filasHTML += `
+            <tr>
+                <td style="text-align:center;">${index + 1}</td>
+                <td class="col-nombre">${est.nombre}</td>
+                <td style="text-align:center;">${est.dni}</td>
+                ${tdVacios}
+            </tr>
+        `;
     });
 
-    // 5. Generar PDF
+    // 5. Generar PDF Vertical
     const ventana = window.open('', '_blank');
     ventana.document.write(`
         <html>
         <head>
-            <title>Lista ${grado} ${seccion} - Newton</title>
+            <title>Lista ${grado} ${seccion}</title>
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
                 
                 body { 
                     font-family: 'Roboto', sans-serif; 
-                    padding: 20px; 
-                    font-size: 11px; /* Letra un poco más pequeña para que entre todo */
+                    padding: 0; 
+                    margin: 0;
+                    font-size: 11px; 
                     color: #1e293b;
                 }
                 
-                /* CABECERA ESTILO NEWTON */
+                /* CABECERA */
                 .header-container {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     border-bottom: 2px solid #2563eb;
-                    padding-bottom: 10px;
-                    margin-bottom: 15px;
+                    padding-bottom: 8px;
+                    margin-bottom: 10px;
                 }
                 .titulo-principal {
-                    font-size: 22px;
+                    font-size: 18px;
                     font-weight: 700;
-                    color: #1e3a8a; /* Azul oscuro */
+                    color: #1e3a8a;
                     margin: 0;
+                    text-transform: uppercase;
                 }
-                .subtitulo {
-                    font-size: 12px;
-                    color: #64748b;
-                    margin: 2px 0 0 0;
-                }
+                .subtitulo { font-size: 11px; color: #64748b; margin: 0; }
 
                 /* CAJA DE DATOS */
                 .info-box {
-                    background-color: #eff6ff; /* Celeste muy claro */
+                    background-color: #eff6ff; 
                     border: 1px solid #bfdbfe;
-                    border-radius: 6px;
-                    padding: 10px 15px;
+                    border-radius: 4px;
+                    padding: 8px;
                     display: flex;
-                    justify-content: space-around;
+                    justify-content: space-between; /* Distribuye mejor en vertical */
                     font-weight: bold;
                     color: #1e40af;
-                    margin-bottom: 15px;
-                    font-size: 12px;
-                }
-
-                /* TABLA AZUL */
-                table { width: 100%; border-collapse: collapse; }
-                
-                th {
-                    background-color: #2563eb; /* Azul Newton */
-                    color: white;
-                    padding: 8px 4px;
-                    border: 1px solid #1d4ed8;
-                    font-weight: 600;
-                    font-size: 10px;
-                    text-transform: uppercase;
-                }
-
-                td {
-                    border: 1px solid #cbd5e1;
-                    padding: 4px 6px;
+                    margin-bottom: 10px;
                     font-size: 11px;
                 }
 
-                /* EFECTO CEBRA EN AZUL */
-                tr:nth-child(even) { background-color: #f8fafc; }
-                tr:hover { background-color: #e0f2fe; }
+                /* TABLA */
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    table-layout: fixed; /* Importante para respetar anchos */
+                }
+                
+                th {
+                    background-color: #2563eb; 
+                    color: white;
+                    padding: 6px 2px;
+                    border: 1px solid #1e40af;
+                    font-weight: 600;
+                    font-size: 9px;
+                    text-align: center;
+                    overflow: hidden;
+                }
 
-                /* CONTROL DE ANCHOS */
-                .col-nro { width: 3%; }
+                td {
+                    border: 1px solid #94a3b8; /* Borde un poco más visible para escribir */
+                    padding: 4px 4px;
+                    font-size: 10px;
+                    height: 18px; /* Altura fija para que sea cómodo escribir a mano */
+                }
+
+                /* ESTILOS DE COLUMNAS PARA VERTICAL */
+                .col-nro { width: 4%; text-align: center; font-weight: bold; background: #f1f5f9; }
+                .col-dni { width: 10%; text-align: center; }
                 .col-nombre { 
-                    width: 35%; /* Ancho reducido para nombres */
+                    width: 40%; /* 40% para el nombre es ideal en vertical */
+                    text-align: left;
+                    padding-left: 8px;
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis; 
+                    text-transform: uppercase; /* Nombres en mayúsculas se ven mejor */
                 }
-                .col-dni { width: 8%; }
-                .casillero { width: auto; } /* El resto se reparte equitativamente */
+                /* El resto (46%) se divide entre las 8 columnas vacías */
+
+                /* EFECTO CEBRA */
+                tr:nth-child(even) { background-color: #f8fafc; }
 
                 @media print {
-                    @page { size: A4 landscape; margin: 10mm; } /* Horizontal para más espacio */
+                    @page { 
+                        size: A4 portrait; /* VERTICAL */
+                        margin: 10mm; 
+                    }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
@@ -6381,20 +6398,19 @@ function imprimirListaSeccion() {
         <body>
             <div class="header-container">
                 <div>
-                    <h1 class="titulo-principal">I.E. NEWTON</h1>
-                    <p class="subtitulo">Sistema de Gestión Académica</p>
+                    <h1 class="titulo-principal">I. E. P. NEWTON SCHOOL</h1>
+                    <p class="subtitulo">Registro Auxiliar de Evaluación y Asistencia</p>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:14px; font-weight:bold; color:#1e3a8a;">LISTA DE CLASE</div>
-                    <div style="font-size:10px;">${new Date().toLocaleDateString()}</div>
+                    <div style="font-size:12px; font-weight:bold; color:#1e3a8a;">${grado} - ${seccion}</div>
+                    <div style="font-size:9px;">${new Date().toLocaleDateString()}</div>
                 </div>
             </div>
 
             <div class="info-box">
-                <span>${anio}</span>
-                <span>${nivel}</span>
-                <span>${grado}</span>
-                <span>${seccion}</span>
+                <span>AÑO: ${anio}</span>
+                <span>NIVEL: ${nivel}</span>
+                <span>TOTAL EST: ${estudiantes.length}</span>
             </div>
 
             <table>
@@ -6403,7 +6419,8 @@ function imprimirListaSeccion() {
                         <th class="col-nro">N°</th>
                         <th class="col-nombre">APELLIDOS Y NOMBRES</th>
                         <th class="col-dni">DNI</th>
-                        ${thVacios} </tr>
+                        ${thVacios}
+                    </tr>
                 </thead>
                 <tbody>
                     ${filasHTML}
@@ -6411,7 +6428,6 @@ function imprimirListaSeccion() {
             </table>
             
             <script>
-                // Imprimir automáticamente al cargar
                 window.onload = function() { window.print(); }
             </script>
         </body>
