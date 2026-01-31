@@ -1739,6 +1739,7 @@ function editarSeccion(id, nivel, grado, nombre, vacantes) {
 
 //------MATRÍCULA MASIVA-------------------------------------------------------------
 let listaAlumnosLocal = []; // Para filtrar sin volver al servidor
+let seleccionadosSet = new Set(); // <--- NUEVO: Memoria de seleccionados
 
 function renderMatriculaMasivaView() {
     // 1. Validación de Roles
@@ -1755,6 +1756,7 @@ function renderMatriculaMasivaView() {
     }
 
     const content = document.getElementById('content-area');
+    seleccionadosSet.clear();
     
     // 3. CAMBIO: Inyectamos ${anioActivoNombre} directamente en el HTML
     content.innerHTML = `
@@ -1790,8 +1792,8 @@ function renderMatriculaMasivaView() {
                     </select>
                 </div>
                 <div style="display: flex; justify-content: center;">
-                    <button id="btn-matricular" class="btn-matricula-especial" onclick="ejecutarMatriculaMasiva()">
-                        <i class="material-icons">how_to_reg</i> CONFIRMAR MATRÍCULA
+                    <button id="btn-matricular" class="btn-matricula-especial" onclick="ejecutarMatriculaMasiva()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                        <i class="material-icons">how_to_reg</i> MATRICULAR (0)
                     </button>
                 </div>
             </div>
@@ -1912,24 +1914,26 @@ function filtrarSeccionesDestino() {
 
 function dibujarTablaAlumnos(lista) {
     const tbody = document.getElementById('body-matricula-masiva');
-    
-    // ESCUDO: Si el elemento no existe (porque cambiaste de vista), salimos en paz.
     if (!tbody) return;
     
     if (lista.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">No se encontraron alumnos con ese criterio.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">No se encontraron alumnos.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = lista.map(al => `
+    tbody.innerHTML = lista.map(al => {
+        // VERIFICAMOS SI ESTÁ EN MEMORIA
+        const estaMarcado = seleccionadosSet.has(String(al.id)) ? 'checked' : '';
+        
+        return `
         <tr>
             <td style="text-align: center;">
-                <input type="checkbox" class="alumno-check" value="${al.id}" onchange="actualizarContadorSeleccionados()">
+                <input type="checkbox" class="alumno-check" value="${al.id}" ${estaMarcado} onchange="toggleSeleccionAlumno('${al.id}', this)">
             </td>
             <td style="font-family: 'Roboto Mono', monospace;">${al.dni}</td>
             <td style="font-weight: 600;">${al.nombreCompleto}</td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function filtrarTablaAlumnos() {
@@ -1947,13 +1951,24 @@ function filtrarTablaAlumnos() {
 }
 
 function toggleTodosAlumnos(source) {
-    const checks = document.querySelectorAll('.alumno-check');
-    checks.forEach(c => c.checked = source.checked);
+    const checks = document.querySelectorAll('.alumno-check'); // Solo los visibles
+    
+    checks.forEach(c => {
+        c.checked = source.checked;
+        const id = c.value;
+        if (source.checked) {
+            seleccionadosSet.add(id);
+        } else {
+            seleccionadosSet.delete(id);
+        }
+    });
+    actualizarBotonMatricula();
 }
 
 async function ejecutarMatriculaMasiva() {
     const idSeccion = document.getElementById('mat-seccion').value;
-    const seleccionados = Array.from(document.querySelectorAll('.alumno-check:checked')).map(c => c.value);
+    // --- CAMBIO CLAVE: Usamos el Set en lugar de querySelectorAll ---
+    const seleccionados = Array.from(seleccionadosSet);
     const btn = document.getElementById('btn-matricular');
 
     if (!idSeccion) return lanzarNotificacion('error', 'MATRÍCULA', 'Debe seleccionar una sección de destino.');
@@ -2023,6 +2038,37 @@ function actualizarContadorSeleccionados() {
             btn.style.cursor = "pointer";
         } else {
             // Si es 0, lo desactivamos visualmente
+            btn.disabled = true;
+            btn.style.opacity = "0.6";
+            btn.style.cursor = "not-allowed";
+        }
+    }
+}
+
+function toggleSeleccionAlumno(id, checkbox) {
+    const idStr = String(id);
+    if (checkbox.checked) {
+        seleccionadosSet.add(idStr);
+    } else {
+        seleccionadosSet.delete(idStr);
+        // Si desmarca uno individualmente, desmarcamos el "Check All" por coherencia
+        document.getElementById('check-all').checked = false;
+    }
+    actualizarBotonMatricula();
+}
+
+function actualizarBotonMatricula() {
+    const btn = document.getElementById('btn-matricular');
+    const cantidad = seleccionadosSet.size;
+    
+    if (btn) {
+        btn.innerHTML = `<i class="material-icons">how_to_reg</i> MATRICULAR (${cantidad})`;
+        
+        if (cantidad > 0) {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+        } else {
             btn.disabled = true;
             btn.style.opacity = "0.6";
             btn.style.cursor = "not-allowed";
