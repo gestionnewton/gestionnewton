@@ -2161,7 +2161,7 @@ function renderSeccionesConsultasView() {
 }
 
 // --- LÓGICA PESTAÑA 1: POR ESTUDIANTE (ACTUALIZADA CON BOTONES) ---
-function filtrarHistorialEstudiante() {
+/*function filtrarHistorialEstudiante() {
     const input = document.getElementById('busqueda-historial');
     const btnLimpiar = document.getElementById('btn-clear-historial');
     const tbody = document.getElementById('body-historial');
@@ -2233,6 +2233,88 @@ function filtrarHistorialEstudiante() {
         }
     });
     tbody.innerHTML = html;
+}*/
+
+function filtrarHistorialEstudiante() {
+    const input = document.getElementById('busqueda-historial');
+    const btnLimpiar = document.getElementById('btn-clear-historial');
+    const tbody = document.getElementById('body-historial');
+    const puedeEditar = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role);
+    
+    if (!dataConsultas.estudiantes) return;
+
+    const busqueda = input.value.toLowerCase().trim();
+    
+    // Mostramos botón X si hay texto
+    btnLimpiar.style.display = busqueda ? 'block' : 'none';
+
+    if (busqueda.length < 1) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Escriba al menos un apellido o DNI...</td></tr>';
+        return;
+    }
+
+    // 1. Primer filtro: Encontrar personas por nombre/DNI
+    const estudiantesFiltrados = dataConsultas.estudiantes.filter(e => {
+        const nombre = String(e.nombreCompleto || "").toLowerCase();
+        const dni = String(e.dni || "");
+        return nombre.includes(busqueda) || dni.includes(busqueda);
+    });
+
+    if (estudiantesFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No se encontraron estudiantes en la base de datos.</td></tr>';
+        return;
+    }
+
+    let html = "";
+    
+    estudiantesFiltrados.forEach(est => {
+        // 2. SEGUNDO FILTRO (CRÍTICO): Solo matrículas con estado 'ACTIVO'
+        // Si quisieras que sea solo del año actual, añade: && m.idAnio == anioActivoID
+        const matsActivas = dataConsultas.matriculas.filter(m => m.idEst === est.id && m.estado === 'ACTIVO');
+        const nombreMayus = String(est.nombreCompleto).toUpperCase();
+        
+        // 3. Solo dibujamos si sobrevivió al filtro de estado
+        if (matsActivas.length > 0) {
+            matsActivas.sort((a,b) => b.fecha - a.fecha).forEach(m => {
+                const anio = dataConsultas.anios.find(a => a.id === m.idAnio);
+                const sec = dataConsultas.secciones.find(s => s.id === m.idSec);
+                
+                // Estilo fijo verde porque ya sabemos que es Activo
+                const rowStyle = 'background-color: #f0fdf4; border-left: 4px solid #22c55e;';
+
+                html += `<tr style="${rowStyle}">
+                    <td style="font-weight:700;">${nombreMayus}</td>
+                    <td>${est.dni}</td>
+                    <td>${anio ? anio.nombre : 'N/A'}</td>
+                    <td>${sec ? `${sec.grado} - ${sec.nombre}` : 'N/A'}</td>
+                    <td><span class="badge" style="background:#22c55e; color:white;">${m.estado}</span></td>
+                    <td style="text-align:center;">
+                        <div class="action-buttons" style="justify-content: center; gap: 8px;">
+                            <button class="btn-icon edit" style="background:#0ea5e9; color:white; width:auto; padding: 0 10px;" onclick="verExpediente('${est.id}', this)">
+                                <i class="material-icons">visibility</i> VER
+                            </button>
+                            
+                            ${puedeEditar ? `
+                            <button class="btn-icon delete" style="background:#f59e0b; color:white; width:auto; padding: 0 10px;" onclick="abrirModalEstado('${m.id}', '${m.estado}', '${nombreMayus}')">
+                                <i class="material-icons">history_edu</i> ESTADO
+                            </button>
+                            <button class="btn-icon" style="background:#14b8a6; color:white; width:auto; padding: 0 10px;" onclick="abrirModalCambiarSeccion('${m.id}', '${m.idSec}', '${nombreMayus}')">
+                                <i class="material-icons">swap_horiz</i> SECCIÓN
+                            </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+    });
+    
+    // Si después de filtrar por estado no queda nada, avisamos
+    if (html === "") {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: #64748b;">El estudiante existe, pero no tiene matrícula ACTIVA.</td></tr>';
+    } else {
+        tbody.innerHTML = html;
+    }
 }
 
 
@@ -2582,6 +2664,7 @@ function pedirConfirmacionCambio(idMat, nombreEst) {
     document.body.appendChild(modalConfirm);
 }
 
+//ejecutarCambioEstadoFinal es la función para TRASLADOS
 async function ejecutarCambioEstadoFinal(idMat, nuevoEstado) {
     const btnConfirmar = document.querySelector('#confirm-notify .btn-primary');
     const originalHTML = btnConfirmar.innerHTML;
@@ -2593,19 +2676,29 @@ async function ejecutarCambioEstadoFinal(idMat, nuevoEstado) {
         const res = await sendRequest('update_estado_mat', { idMat: idMat, estado: nuevoEstado });
         
         if (res.status === 'success') {
-            // Actualizar memoria local
+            // Actualizar memoria local de la tabla
             const index = dataConsultas.matriculas.findIndex(m => m.id === idMat);
             if (index !== -1) dataConsultas.matriculas[index].estado = nuevoEstado;
 
-            // Cerrar todos los modales abiertos
+            // Cerrar modales
             document.getElementById('confirm-notify').remove();
             if (document.getElementById('modal-seleccion-estado')) {
                 document.getElementById('modal-seleccion-estado').remove();
             }
 
             lanzarNotificacion('success', 'SISTEMA', res.message);
-            consultarListaSeccion(); // Refrescar tabla
+            consultarListaSeccion(); 
             if (document.getElementById('busqueda-historial')) filtrarHistorialEstudiante();
+
+            // --- NUEVO: ACTUALIZAR DASHBOARD ---
+            // 1. Borramos la caché local antigua
+            cacheDashboardData = null; 
+            
+            // 2. Pedimos los datos frescos al servidor (donde ya se limpió la caché)
+            // Esto actualizará los contadores y gráficos si el usuario vuelve al inicio
+            cargarDatosDashboard(); 
+            // -----------------------------------
+
 
         } else {
             lanzarNotificacion('error', 'ERROR', res.message);
@@ -2617,6 +2710,7 @@ async function ejecutarCambioEstadoFinal(idMat, nuevoEstado) {
         btnConfirmar.innerHTML = originalHTML;
         btnConfirmar.disabled = false;
     }
+
 }
 
 
@@ -2734,9 +2828,9 @@ function renderTrasladosView() {
                 <thead>
                     <tr>
                         <th>FECHA</th>
-                        <th>DNI</th>
-                        <th>ESTUDIANTE</th>
-                        <th style="text-align:center;">ESTADO</th>
+                        <th>ESTUDIANTE / DNI</th>
+                        <th>NIVEL / SECCIÓN</th>
+                        <th style="text-align:center;">CAMBIO ESTADO</th>
                         <th>RESPONSABLE</th>
                     </tr>
                 </thead>
@@ -2807,18 +2901,30 @@ function filtrarTablaTraslados() {
     }
 
     tbody.innerHTML = filtrados.map(t => {
-        const fecha = t.fecha ? new Date(t.fecha).toLocaleDateString() : '---';
+        const fecha = t.fecha ? new Date(t.fecha).toLocaleDateString('es-PE', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        }) : '---';
+
         return `
             <tr>
-                <td style="color: #64748b; font-size: 0.85rem;">${fecha}</td>
-                <td style="font-family: 'Roboto Mono', monospace;">${t.dni}</td>
-                <td style="font-weight: 700; color: #1e293b;">${String(t.estudiante).toUpperCase()}</td>
+                <td style="color: #64748b; font-size: 0.8rem;">${fecha}</td>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b;">${t.estudiante}</div>
+                    <div style="font-size: 0.75rem; color: #64748b; font-family: monospace;">DNI: ${t.dni}</div>
+                </td>
+                <td>
+                    <div style="font-weight: 600; font-size: 0.85rem;">${t.nivel}</div>
+                    <div style="font-size: 0.75rem; color: #0369a1;">${t.grado} - ${t.seccion}</div>
+                </td>
                 <td style="text-align:center;">
-                    <span class="badge" style="background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800;">TRASLADADO</span>
+                    <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">${t.estadoAnterior} ➜</div>
+                    <span class="badge" style="background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800;">
+                        ${t.estadoNuevo}
+                    </span>
                 </td>
-                <td style="font-size: 0.85rem; color: #0369a1;">
-                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">person</i> ${t.usuario}
-                </td>
+                <td style="font-size: 0.75rem; color: #64748b;">
+                    <i class="material-icons" style="font-size: 14px; vertical-align: middle; color: #94a3b8;">person</i> 
+                    ${t.usuario.split('@')[0]} </td>
             </tr>
         `;
     }).join('');
@@ -5548,7 +5654,7 @@ async function buscarDetalleServidor(nro) {
 /*--------------------------------------------------*/
 /* --- MÓDULO DASHBOARD --- */
 /* --- SCRIPT.JS: CARGA INTELIGENTE --- */
-let cacheDashboardData = null; // Memoria local
+let cacheDashboardData = null; // Se encuentra al inicio del script - Memoria local
 // Variables globales para los objetos de Chart.js (para poder destruirlos al recargar)
 let chartPrimariaObj = null;
 let chartSecundariaObj = null;
@@ -5801,25 +5907,6 @@ function generarFilasTablaDashboard(secciones) {
     `).join('');
 }
 
-async function cargarDatosDashboard() {
-    if (!anioActivoID) return;
-
-    try {
-        const res = await sendRequest('get_stats_dashboard', { idAnio: anioActivoID });
-        
-        if (res.status === 'success') {
-            // Si la data nueva es diferente a la caché (o no hay caché), animamos
-            const dataCambio = JSON.stringify(res) !== JSON.stringify(cacheDashboardData);
-            
-            cacheDashboardData = res; 
-
-            if (dataCambio) {
-                mostrarDatosEnDashboard(res);
-            }
-        }
-    } catch (e) { console.error("Error en dashboard:", e); }
-    cargarEventosDelServidor();
-}
 
 function mostrarDatosEnDashboard(res) {
     const s = res.stats;
