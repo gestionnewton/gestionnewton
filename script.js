@@ -3151,7 +3151,7 @@ function guardarConceptoPago(data, usuarioEmail) {
 
 
 
-/*DESCUENTOS-----------------------------------------*/
+/*MÓDULO DESCUENTOS-----------------------------------------*/
 let datosDescuentosLocal = { estudiantes: [], conceptos: [], anio: null };
 let estudianteElegidoDesc = null;
 
@@ -3336,6 +3336,7 @@ function seleccionarEstudianteDesc(est) {
 
 async function procesarGuardadoDescuento() {
     const btn = document.getElementById('btn-save-desc');
+    // Obtenemos los IDs de los conceptos marcados
     const seleccionados = Array.from(document.querySelectorAll('input[name="desc-con-check"]:checked')).map(cb => cb.value);
     const monto = document.getElementById('desc-monto').value;
     const observacion = document.getElementById('desc-obs').value;
@@ -3355,22 +3356,33 @@ async function procesarGuardadoDescuento() {
             idAnio: anioActivoID,
             monto: monto,
             conceptosIds: seleccionados,
-            obs: observacion // Enviamos la observación aunque sea opcional
+            obs: observacion 
         });
 
         if (res.status === 'success') {
             lanzarNotificacion('success', 'ÉXITO', res.message);
+            
+            // --- NUEVO: Sincronización instantánea con Caja ---
+            // Enviamos los datos a la memoria global 'dbRecibo' antes de borrar 'estudianteElegidoDesc'
+            sincronizarDescuentoEnCaja(estudianteElegidoDesc.idEst, seleccionados, monto);
+            // --------------------------------------------------
+
             // Limpiar variables y recargar vista
             estudianteElegidoDesc = null;
             renderDescuentosView();
+            
         } else {
             lanzarNotificacion('error', 'SISTEMA', res.message);
         }
     } catch (e) {
+        console.error(e);
         lanzarNotificacion('error', 'CONEXIÓN', 'No se pudo comunicar con el servidor.');
     } finally {
-        btn.innerHTML = originalHTML;
-        btn.disabled = false;
+        // Restaurar botón si la vista no se ha destruido
+        if (btn) {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -3487,6 +3499,7 @@ function cargarConceptosParaEstudiante(idSecEstudiante) {
     }
 }
 
+
 /*NUEVO RECIBO-------------------------------------------*/
 /* =========================================
    MÓDULO: NUEVO RECIBO - FASE 1 (CORREGIDA)
@@ -3495,6 +3508,28 @@ function cargarConceptosParaEstudiante(idSecEstudiante) {
 let dbRecibo = null;      // Cambiado de {} a null para validación inicial
 let borradorRecibo = []; 
 let estSelRecibo = null; 
+
+/**
+ * INYECTAR DESCUENTO EN MEMORIA
+ * Esta función actualiza la variable global 'dbRecibo' para que el módulo
+ * de Caja reconozca el descuento sin tener que volver a pedir datos al servidor.
+ */
+/* --- FUNCIÓN DE SINCRONIZACIÓN INMEDIATA --- */
+function sincronizarDescuentoEnCaja(idEstudiante, listaIdsConceptos, montoDescuento) {
+    // Verificamos si la base de datos local de recibos existe
+    if (typeof dbRecibo !== 'undefined' && dbRecibo && dbRecibo.descuentos) {
+        console.log("🔄 Actualizando memoria de Caja con nuevos descuentos...");
+        
+        listaIdsConceptos.forEach(idCon => {
+            dbRecibo.descuentos.push({
+                idEst: idEstudiante, 
+                idCon: idCon,       
+                monto: parseFloat(montoDescuento) // Aseguramos que sea número
+            });
+        });
+    }
+}
+
 
 async function inicializarDataRecibo() {
     const res = await sendRequest('get_datos_recibo');
@@ -3509,10 +3544,11 @@ async function inicializarDataRecibo() {
 }
 
 
-/* --- MODIFICACIÓN EN renderNuevoReciboView (script.js) --- */
-
 // Variable global para saber en qué pestaña estamos (1=Regular, 2=Adicional, 3=Excepcional)
 let pestanaActivaRecibo = 1;
+
+
+
 
 function renderNuevoReciboView() {
     const roles = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'];
