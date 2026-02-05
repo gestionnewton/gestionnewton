@@ -58,7 +58,7 @@
                     <i class="material-icons">dashboard</i> Dashboard
                 </a>
                 
-                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo', this)" data-roles="SECRETARIA,ADMINISTRADOR,DIRECTIVO">
+                <a href="#" class="menu-item" onclick="loadView('nuevo-recibo', this)" data-roles="SECRETARIA,ADMINISTRADOR">
                     <i class="material-icons">receipt</i> Nuevo Recibo
                 </a>
 
@@ -73,7 +73,7 @@
                         <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('recibos', this)">Recibos</a>
                         <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('historial-pagos', this)">Historial de pagos</a>
                         <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('egresos', this)">Egresos</a>
-                        <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('caja-diaria', this)">Caja</a>
+                        <a href="#" data-roles="ADMINISTRADOR,DIRECTIVO" onclick="loadView('caja-diaria', this)">Caja</a>
                         <a href="#" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO" onclick="loadView('reportes_pagos', this)">Reportes</a>
 
                     </div>
@@ -91,7 +91,7 @@
                     </div>
                 </div>
 
-                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA">
+                <div class="menu-dropdown" data-roles="ADMINISTRADOR,SECRETARIA,DIRECTIVO">
                     <button class="dropdown-btn">
                         <span><i class="material-icons">group</i> Registros</span>
                         <i class="material-icons arrow">expand_more</i>
@@ -161,5 +161,4 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 </body>
-
 </html>

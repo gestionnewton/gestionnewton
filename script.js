@@ -1743,7 +1743,7 @@ let seleccionadosSet = new Set(); // <--- NUEVO: Memoria de seleccionados
 
 function renderMatriculaMasivaView() {
     // 1. Validación de Roles
-    if (currentUser.role !== 'ADMINISTRADOR' && currentUser.role !== 'SECRETARIA') {
+    if (currentUser.role !== 'ADMINISTRADOR' && currentUser.role !== 'SECRETARIA' && currentUser.role !== 'DIRECTIVO') {
         lanzarNotificacion('error', 'ACCESO', 'DENEGADO', 'No autorizado.');
         return;
     }
@@ -3547,9 +3547,6 @@ async function inicializarDataRecibo() {
 // Variable global para saber en qué pestaña estamos (1=Regular, 2=Adicional, 3=Excepcional)
 let pestanaActivaRecibo = 1;
 
-
-
-
 function renderNuevoReciboView() {
     const roles = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'];
     if (!roles.includes(currentUser.role)) {
@@ -3666,11 +3663,12 @@ function renderNuevoReciboView() {
                 </div>
 
                 <div id="rec-footer-final" style="display:none; margin-top:25px; border-top:3px solid #e2e8f0; padding-top:25px;">
+                    
                     <div id="rec-datos-digital" style="display:none; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px; background:#fff7ed; padding:15px; border-radius:16px; border:1px solid #fed7aa;">
                         <div>
                             <label class="data-label-outline" style="font-size: 0.9rem !important;">MEDIO DIGITAL</label>
                             <select id="rec-medio" class="custom-select select-compact">
-                                <option value="" selected disabled>--- Seleccione Medio ---</option>
+                                <option value="" selected disabled>--- Seleccione ---</option>
                                 <option value="YAPE">YAPE</option><option value="PLIN">PLIN</option>
                                 <option value="TRANSFERENCIA">TRANSFERENCIA</option><option value="TARJETA">TARJETA / POS</option>
                             </select>
@@ -3682,14 +3680,28 @@ function renderNuevoReciboView() {
                     </div>
 
                     <label class="data-label-outline" style="font-size: 1rem !important;">OBSERVACIONES</label>
-                    <input type="text" id="rec-obs" class="desc-input" placeholder="Opcional..." style="margin-bottom:20px; width: 100%; font-size: 1.1rem !important;">
+                    <input type="text" id="rec-obs" class="desc-input" placeholder="Opcional..." style="margin-bottom:25px; width: 100%; font-size: 1.1rem !important;">
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; background: white; padding: 15px 20px; border-radius: 18px; border: 1px solid #e2e8f0;">
-                        <div style="font-size:1.5rem; font-weight:900; color:var(--text-main);">
-                            TOTAL: <span id="rec-lbl-total" style="color:var(--primary-blue); font-size: 2rem;">S/ 0.00</span>
+                    <div style="background: white; padding: 25px; border-radius: 24px; border: 1px solid #e2e8f0; box-shadow: var(--shadow-sm);">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 15px; text-align: center;">
+                                <div style="font-size: 0.85rem; color: #059669; font-weight: 800; margin-bottom: 5px;">TOTAL EFECTIVO</div>
+                                <div id="lbl-total-efectivo" style="font-size: 1.6rem; font-weight: 900; color: #047857;">S/ 0.00</div>
+                            </div>
+                            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 15px; text-align: center;">
+                                <div style="font-size: 0.85rem; color: #0284c7; font-weight: 800; margin-bottom: 5px;">TOTAL DIGITAL</div>
+                                <div id="lbl-total-digital" style="font-size: 1.6rem; font-weight: 900; color: #0369a1;">S/ 0.00</div>
+                            </div>
                         </div>
-                        <button id="btn-save-rec" class="btn-matricula-especial" style="width:auto; padding:12px 25px; font-size: 1.3rem; white-space: nowrap; margin-left: 20px;" onclick="enviarProcesarRecibo()">
-                            <i class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 1.6rem;">check_circle</i> GENERAR
+
+                        <div style="text-align: center; border-top: 2px dashed #cbd5e1; padding-top: 20px; margin-bottom: 20px;">
+                            <div style="font-size: 1rem; color: var(--text-muted); font-weight: 700; margin-bottom: 5px;">TOTAL A PAGAR</div>
+                            <div id="rec-lbl-total" style="font-size: 2.8rem; font-weight: 900; color: var(--primary-blue); line-height: 1;">S/ 0.00</div>
+                        </div>
+
+                        <button id="btn-save-rec" class="btn-matricula-especial" style="width:100%; padding:18px; font-size: 1.4rem; border-radius: 16px;" onclick="enviarProcesarRecibo()">
+                            <i class="material-icons" style="vertical-align: middle; margin-right: 10px; font-size: 1.8rem;">check_circle</i> GENERAR RECIBO
                         </button>
                     </div>
                 </div>
@@ -3697,10 +3709,55 @@ function renderNuevoReciboView() {
         </div>
     `;
     
-    // Por defecto, iniciamos en la pestaña 1
     pestanaActivaRecibo = 1;
     inicializarDataRecibo();
 }
+
+/* --- FUNCIONES DE OPTIMIZACIÓN
+Actualiza dbRecibo localmente para que reconozca que ya se pagó el concepto
+sin tener que recargar toda la página desde el servidor.
+ */
+function actualizarMemoriaLocalPagos(itemsPagados) {
+    if (!dbRecibo || !dbRecibo.pagosPrevios) return;
+
+    console.log("⚡ Actualizando memoria local de pagos...");
+    
+    itemsPagados.forEach(it => {
+        dbRecibo.pagosPrevios.push({
+            idEst: it.idEst,
+            idCon: it.idCon,
+            total: parseFloat(it.totalInd)
+        });
+    });
+}
+
+/**
+ * Resetea visualmente el formulario de recibo para uno nuevo
+ * sin volver a renderizar todo el HTML.
+ */
+function resetearInterfazRecibo() {
+    // 1. Limpiar variables globales del módulo
+    borradorRecibo = [];
+    estSelRecibo = null;
+
+    // 2. Limpiar visualmente el borrador y totales
+    actualizarVistaBorrador();
+
+    // 3. Limpiar buscador y ocultar paneles de selección
+    limpiarBuscadorRec(); 
+    document.getElementById('rec-info-alumno').style.display = 'none';
+    document.getElementById('rec-panel-montos').style.display = 'none';
+
+    // 4. Limpiar campos finales (Observación, Código, Medio)
+    const inputCod = document.getElementById('rec-cod');
+    const inputObs = document.getElementById('rec-obs');
+    const selectMedio = document.getElementById('rec-medio');
+    
+    if (inputCod) inputCod.value = '';
+    if (inputObs) inputObs.value = '';
+    if (selectMedio) selectMedio.selectedIndex = 0;
+}
+
 
 function cambiarPestanaRecibo(n, btn) {
     pestanaActivaRecibo = n;
@@ -3714,13 +3771,13 @@ function cambiarPestanaRecibo(n, btn) {
     const lblBuscar = document.getElementById('lbl-buscar-est');
 
     if (n === 1) {
-        titulo.innerText = "1. PAGO REGULAR (Pensiones)";
+        titulo.innerText = "1. PAGO REGULAR (Matrícula y Pensiones)";
         lblBuscar.innerText = "BUSCAR ESTUDIANTE (MATRICULADO)";
     } else if (n === 2) {
-        titulo.innerText = "1. PAGO ADICIONAL (Talleres/Materiales)";
+        titulo.innerText = "1. PAGO ADICIONAL (Módulos, Agenda y Peruanidad)";
         lblBuscar.innerText = "BUSCAR ESTUDIANTE (MATRICULADO)";
     } else {
-        titulo.innerText = "1. PAGO EXCEPCIONAL (Multas/Otros)";
+        titulo.innerText = "1. PAGO EXCEPCIONAL (Otros)";
         lblBuscar.innerText = "BUSCAR TODOS (INCLUYE NO MATRICULADOS)";
     }
 
@@ -4051,16 +4108,16 @@ function agregarItemBorrador() {
         idCon: estSelRecibo.idConActual,
         nomCon: estSelRecibo.nomConActual,
         tipo: estSelRecibo.tipoConActual,
+        nivel: estSelRecibo.nivel || '',   
+        grado: estSelRecibo.grado || '',
+        seccion: estSelRecibo.secNom || '',
+        fechaMatricula: estSelRecibo.fechaMat,
+        idSec: estSelRecibo.idSec, 
 
         efectivo: efec,
         digital: digi,
         totalInd: total,
-        
-        // --- CORRECCIÓN AQUÍ ---
-        // Tomamos la fecha del objeto seleccionado actualmente
         fechaProg: estSelRecibo.fechaProg || null, 
-        // -----------------------
-
         saldoPrevio: saldoAGuardar
     });
 
@@ -4074,49 +4131,47 @@ function agregarItemBorrador() {
 
 /**
  * Dibuja los elementos del carrito y calcula el total general
- */
-/**
  * Dibuja los elementos del borrador y bloquea la eliminación de ítems previos
  */
 function actualizarVistaBorrador() {
     const cont = document.getElementById('rec-lista-borrador');
     const placeholder = document.getElementById('placeholder-vacio');
-    
+    const footer = document.getElementById('rec-footer-final');
+
     if (borradorRecibo.length === 0) {
         if (placeholder) placeholder.style.display = 'block';
         cont.innerHTML = ''; 
-        document.getElementById('rec-footer-final').style.display = 'none';
+        if (footer) footer.style.display = 'none';
         return;
     }
 
     if (placeholder) placeholder.style.display = 'none';
 
-    // Generar la lista visual
+    // Lista visual de ítems
     cont.innerHTML = borradorRecibo.map((it, idx) => {
-        // --- LÓGICA DE BLOQUEO ---
         const esUltimo = idx === borradorRecibo.length - 1;
+        const accionBoton = esUltimo ? `onclick="borrarItemBorrador(${idx})"` : '';
         const estiloBoton = esUltimo 
             ? 'color: #ef4444; cursor: pointer; opacity: 1;' 
             : 'color: #cbd5e1; cursor: not-allowed; opacity: 0.5;';
-        const accionBoton = esUltimo 
-            ? `onclick="borrarItemBorrador(${idx})"` 
-            : '';
-        const tituloBoton = esUltimo 
-            ? 'Eliminar cobro' 
-            : 'Solo puede eliminar el último ítem agregado';
 
         return `
             <div class="animate__animated animate__fadeInLeft" style="background:#f8fafc; border-radius:12px; padding:15px; margin-bottom:10px; border-left:5px solid ${esUltimo ? 'var(--primary-blue)' : '#cbd5e1'}; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <div style="font-weight:800; color:${esUltimo ? 'var(--text-main)' : '#94a3b8'}; font-size:0.95rem;">${it.nombre}</div>
                     <div style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">${it.nomCon}</div>
-                    <div style="font-size:0.75rem; color:var(--primary-blue); font-weight:800;">
-                        Ef: S/ ${it.efectivo.toFixed(2)} | Dg: S/ ${it.digital.toFixed(2)}
+                    <div style="display:flex; gap:10px; margin-top:4px;">
+                        <span style="font-size:0.75rem; background:#ecfdf5; color:#047857; padding:2px 6px; border-radius:4px; font-weight:700;">
+                            Ef: S/ ${it.efectivo.toFixed(2)}
+                        </span>
+                        <span style="font-size:0.75rem; background:#f0f9ff; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:700;">
+                            Dig: S/ ${it.digital.toFixed(2)}
+                        </span>
                     </div>
                 </div>
                 <div style="text-align:right;">
                     <div style="font-weight:900; color:${esUltimo ? 'var(--text-main)' : '#94a3b8'}; font-size:1.1rem;">S/ ${it.totalInd.toFixed(2)}</div>
-                    <button ${accionBoton} title="${tituloBoton}" style="background:none; border:none; ${estiloBoton} transition: 0.3s;">
+                    <button ${accionBoton} style="background:none; border:none; ${estiloBoton} margin-top:5px;">
                         <i class="material-icons" style="font-size:1.4rem;">${esUltimo ? 'delete_forever' : 'lock_outline'}</i>
                     </button>
                 </div>
@@ -4124,13 +4179,25 @@ function actualizarVistaBorrador() {
         `;
     }).join('');
 
-    // Totales y validación digital
-    const granTotal = borradorRecibo.reduce((sum, item) => sum + item.totalInd, 0);
-    const tieneDigital = borradorRecibo.some(item => item.digital > 0);
+    // --- CÁLCULO Y ACTUALIZACIÓN DE TOTALES ---
+    const totalEfectivo = borradorRecibo.reduce((sum, item) => sum + item.efectivo, 0);
+    const totalDigital = borradorRecibo.reduce((sum, item) => sum + item.digital, 0);
+    const granTotal = totalEfectivo + totalDigital;
+    const tieneDigital = totalDigital > 0;
 
+    // Actualizamos los números en la nueva estructura HTML
+    document.getElementById('lbl-total-efectivo').innerText = `S/ ${totalEfectivo.toFixed(2)}`;
+    document.getElementById('lbl-total-digital').innerText = `S/ ${totalDigital.toFixed(2)}`;
     document.getElementById('rec-lbl-total').innerText = `S/ ${granTotal.toFixed(2)}`;
-    document.getElementById('rec-footer-final').style.display = 'block';
-    document.getElementById('rec-datos-digital').style.display = tieneDigital ? 'grid' : 'none';
+    
+    // Mostramos el footer
+    if (footer) footer.style.display = 'block';
+    
+    // Panel de datos digitales (si corresponde)
+    const panelDigital = document.getElementById('rec-datos-digital');
+    if (panelDigital) {
+        panelDigital.style.display = tieneDigital ? 'grid' : 'none';
+    }
 }
 
 function borrarItemBorrador(index) {
@@ -4157,54 +4224,62 @@ async function enviarProcesarRecibo() {
         return lanzarNotificacion('error', 'VACÍO', 'No hay ítems en el recibo.');
     }
 
-    // 2. Bloqueo visual del botón para evitar doble clic
+    // 2. Bloqueo visual del botón
     const btn = document.getElementById('btn-save-rec');
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="material-icons rotate">sync</i> PROCESANDO...';
 
     // 3. Petición al Servidor
-    const res = await sendRequest('save_recibo', {
-        idAnio: dbRecibo.anio.id,
-        items: borradorRecibo,
-        medioDigital: tieneDigital ? medioDig : '',
-        codOp: tieneDigital ? codOp : '',
-        obs: obs
-    });
+    try {
+        const res = await sendRequest('save_recibo', {
+            idAnio: dbRecibo.anio.id,
+            items: borradorRecibo,
+            medioDigital: tieneDigital ? medioDig : '',
+            codOp: tieneDigital ? codOp : '',
+            obs: obs
+        });
 
-    // 4. Manejo de Respuesta
-    if (res.status === 'success') {
-        // 1. Notificación silenciosa de éxito en la base de datos
-        console.log(`Recibo N° ${res.nroRecibo} guardado.`);
+        // 4. Manejo de Respuesta
+        if (res.status === 'success') {
+            console.log(`Recibo N° ${res.nroRecibo} guardado.`);
 
-        // 2. Preparamos los datos para la acción posterior
-        const copiaBorrador = JSON.parse(JSON.stringify(borradorRecibo));
-        const mDig = tieneDigital ? medioDig : "";
-        const cOp = tieneDigital ? codOp : "";
-        
-        // 3. NUEVA FUNCIÓN DE ELECCIÓN
-        preguntarAccionRecibo(res.nroRecibo, copiaBorrador, mDig, cOp, obs);
+            // Preparamos datos para el PDF/Ticket
+            const copiaBorrador = JSON.parse(JSON.stringify(borradorRecibo));
+            const mDig = tieneDigital ? medioDig : "";
+            const cOp = tieneDigital ? codOp : "";
+            
+            // Función de elección (Imprimir/PDF)
+            preguntarAccionRecibo(res.nroRecibo, copiaBorrador, mDig, cOp, obs);
 
-        // 4. Limpieza de la interfaz (igual que antes)
-        borradorRecibo = [];
-        estSelRecibo = null;
-        renderNuevoReciboView();
-    } else {
-        lanzarNotificacion('error', 'ERROR', res.message);
+            // --- CAMBIO CLAVE AQUÍ ---
+            // En vez de recargar todo del servidor (que causa el error),
+            // actualizamos la memoria local y limpiamos la pantalla.
+            actualizarMemoriaLocalPagos(copiaBorrador);
+            resetearInterfazRecibo();
+            // -------------------------
 
-        //Si el error es por código duplicado, limpiamos el input
-        const inputCod = document.getElementById('rec-cod');
-        if (inputCod) {
-            inputCod.value = ''; // Borra el código rechazado
-            inputCod.focus();    // Pone el cursor ahí para que escriba el nuevo
+        } else {
+            lanzarNotificacion('error', 'ERROR', res.message);
+            const inputCod = document.getElementById('rec-cod');
+            if (inputCod) {
+                inputCod.value = ''; 
+                inputCod.focus();    
+            }
         }
-
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+    } catch (error) {
+        console.error(error);
+        lanzarNotificacion('error', 'CONEXIÓN', 'Ocurrió un error al intentar guardar.');
+    } finally {
+        // Restaurar botón siempre
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 }
 
-
+/*
 function preguntarAccionRecibo(nro, datos, medio, cod, obs) {
     // Usamos el sistema de notificaciones que ya tienes para mostrar la elección
     // Nota: Ajusta 'lanzarNotificacion' si tu sistema no permite inyectar HTML complejo, 
@@ -4249,19 +4324,91 @@ function preguntarAccionRecibo(nro, datos, medio, cod, obs) {
         document.body.removeChild(overlay);
     };
 }
+*/
+
+/*------ FUNCIÓN MODAL DESPUÉS DE PAGO -------*/
+function preguntarAccionRecibo(nro, datosLocales, medio, cod, obs) {
+    const htmlEleccion = `
+        <div id="modal-eleccion-recibo" style="background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; border-top: 6px solid #2563eb; width: 320px; font-family: sans-serif;">
+            <div style="background: #dcfce7; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto;">
+                <i class="material-icons" style="font-size: 35px; color: #16a34a;">check</i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1e293b; font-size: 1.25rem;">¡Recibo Generado!</h3>
+            <p style="color: #64748b; margin-bottom: 20px; font-size: 0.95rem;">Operación exitosa con el<br><b style="color: #0f172a; font-size: 1.1rem;">N° ${nro}</b></p>
+            
+            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                <button id="opt-imprimir" style="flex: 1; padding: 12px; border: 2px solid #e2e8f0; background: white; border-radius: 10px; cursor: pointer; color: #334155; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                    <i class="material-icons" style="margin-right: 5px; color: #334155;">print</i> TICKET
+                </button>
+                <button id="opt-pdf" style="flex: 1; padding: 12px; border: none; background: #ef4444; border-radius: 10px; cursor: pointer; color: white; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2); transition: all 0.2s;">
+                    <i class="material-icons" style="margin-right: 5px;">picture_as_pdf</i> PDF
+                </button>
+            </div>
+            
+            <button id="btn-cerrar-modal" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">Cerrar sin acciones</button>
+        </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.id = "overlay-eleccion";
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display:flex; align-items:center; justify-content:center; z-index:9999;";
+    overlay.innerHTML = htmlEleccion;
+    document.body.appendChild(overlay);
+
+    const cerrarModal = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
+    document.getElementById('btn-cerrar-modal').onclick = cerrarModal;
+
+    document.getElementById('opt-imprimir').onclick = () => {
+        imprimirTicket(nro, datosLocales, medio, cod, obs);
+        cerrarModal();
+    };
+
+    // --- CORRECCIÓN EN EL CLICK DE PDF ---
+    document.getElementById('opt-pdf').onclick = async () => {
+        lanzarNotificacion('loading', 'PDF', 'Procesando datos...');
+        
+        // Esperamos 1.5 segundos para asegurar que Google Sheets indexe la fila nueva
+        await new Promise(r => setTimeout(r, 1500));
+
+        try {
+            // Enviamos el número limpio
+            const res = await sendRequest('buscarRecibo', { nroRecibo: nro });
+
+            if (res.status === 'success') {
+                descargarTicketPDF(res.data, nro);
+            } else {
+                console.warn("Servidor no encontró el recibo a tiempo:", res.message);
+                // Si falla, usamos los datos locales como respaldo inmediato
+                lanzarNotificacion('warning', 'PDF', 'Generando con datos básicos...');
+                descargarTicketPDF(datosLocales, nro);
+            }
+        } catch (error) {
+            console.error("Error red:", error);
+            descargarTicketPDF(datosLocales, nro);
+        }
+        cerrarModal();
+    };
+}
 
 /*------------------------------------------------------------------*/
 /*IMPRIMIR RECIBO------------------------------*/
-/* --- ACTUALIZAR EN SCRIPT.JS --- */
-
+//Imprime desde NUEVO RECIBO como también del BUSCADOR DE RECIBOS
 function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
     const fechaActual = new Date();
     const fechaStr = fechaActual.toLocaleString('es-PE');
     const logoUrl = 'https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png';
-    const granTotal = datosBorrador.reduce((sum, it) => sum + it.totalInd, 0);
+    
+    const totalEfectivo = datosBorrador.reduce((sum, it) => sum + (parseFloat(it.efectivo) || 0), 0);
+    const totalDigital = datosBorrador.reduce((sum, it) => sum + (parseFloat(it.digital) || 0), 0);
+    const granTotal = totalEfectivo + totalDigital;
 
-    // Iframe invisible
+    // 1. Limpieza previa (por si quedó algún iframe colgado)
+    const oldIframe = document.getElementById('ticket-iframe');
+    if (oldIframe) document.body.removeChild(oldIframe);
+
+    // 2. Crear Iframe invisible
     let iframe = document.createElement('iframe');
+    iframe.id = 'ticket-iframe';
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
     iframe.style.bottom = '0';
@@ -4287,8 +4434,10 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
             .center { text-align: center; }
             .bold { font-weight: bold; }
             .line { border-bottom: 1px dashed #000; margin: 6px 0; }
-            .item { margin-bottom: 10px; }
-            .total-box { margin-top: 10px; font-size: 11pt; border: 1px solid #000; padding: 5px; }
+            .item { margin-bottom: 8px; }
+            .total-box { margin-top: 5px; font-size: 11pt; border: 1px solid #000; padding: 5px; }
+            .subtotals { text-align: right; font-size: 8.5pt; margin-top: 5px; margin-right: 2px; }
+            .deudas-box { margin-top: 10px; border-top: 1px dashed #000; padding-top: 5px; }
             img { filter: grayscale(1); }
         </style>
     </head>
@@ -4306,81 +4455,116 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
         <div class="bold" style="margin-bottom:8px;">DETALLE DE PAGO:</div>
     `;
 
+    // Recolector de deudas adicionales
+    let deudasPorAlumno = {};
+
     datosBorrador.forEach((it, idx) => {
-        const saldoRestante = (it.saldoPrevio || 0) - it.totalInd; 
+        const saldoRestante = (parseFloat(it.saldoPrevio) || 0) - parseFloat(it.totalInd); 
         
-        // --- NUEVA LÓGICA DE ESTADO (Retraso vs Puntual) ---
-        let bloqueEstado = "";
-
-        // Solo calculamos si el ítem tiene una fecha programada válida
-        if (it.fechaProg) {
-            const fechaProg = new Date(it.fechaProg);
-            const hoy = new Date();
-            
-            // Ajustamos a medianoche para comparar solo días, ignorando horas
-            hoy.setHours(0,0,0,0);
-            fechaProg.setHours(0,0,0,0);
-            
-            // Verificamos que sea una fecha válida antes de calcular
-            if (!isNaN(fechaProg.getTime())) {
-                const diffTime = hoy - fechaProg;
-                // Convertimos milisegundos a días
-                const diasAtraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                if (diasAtraso > 0) {
-                    // CASO: MOROSO
-                    bloqueEstado = `<div style="font-size: 8pt; font-weight:bold; margin-top:2px;">Días de retraso: ${diasAtraso}</div>`;
-                } else {
-                    // CASO: PUNTUAL (0 o negativo)
-                    bloqueEstado = `<div style="font-size: 8pt; font-style:italic; margin-top:2px;">Pago puntual.</div>`;
-                }
-            }
+        // Lógica de Avance (Priorizamos el dato que viene del servidor)
+        let textoAvance = it.avancePensiones || "";
+        
+        // Fallback local solo si es necesario
+        if (!textoAvance && it.tipo === 'REGULAR' && typeof dbRecibo !== 'undefined') {
+            const fMat = new Date(it.fechaMatricula); fMat.setHours(0,0,0,0);
+            const conceptosEsperados = dbRecibo.conceptos.filter(c => {
+                const fProg = new Date(c.fechaProg); fProg.setHours(0,0,0,0);
+                return c.tipo === 'REGULAR' && 
+                       c.idsSecciones.split(',').map(s => s.trim()).includes(String(it.idSec)) &&
+                       fProg >= fMat;
+            });
+            const idsEsperados = conceptosEsperados.map(c => String(c.id));
+            const pagadosHist = dbRecibo.pagosPrevios
+                .filter(p => String(p.idEst) === String(it.idEst) && idsEsperados.includes(String(p.idCon)))
+                .map(p => String(p.idCon));
+            const pagadosAhora = datosBorrador
+                .filter(p => String(p.idEst) === String(it.idEst) && idsEsperados.includes(String(p.idCon)))
+                .map(p => String(p.idCon));
+            const totalPagados = [...new Set([...pagadosHist, ...pagadosAhora])].length;
+            if (conceptosEsperados.length > 0) textoAvance = `${totalPagados} / ${conceptosEsperados.length}`;
         }
-        // ----------------------------------------------------
 
-        // Saldo pendiente (Oculto si es pago Excepcional)
+        const bloqueAvance = (textoAvance) 
+            ? `<div style="font-size: 8pt; font-weight:bold; margin-top:2px; border-top: 1px dotted #000; padding-top: 2px;">AVANCE PENSIONES: ${textoAvance}</div>` 
+            : '';
+
+        if (it.deudasAdicionales && it.deudasAdicionales.length > 0) {
+            if (!deudasPorAlumno[it.nombre]) deudasPorAlumno[it.nombre] = [];
+            it.deudasAdicionales.forEach(d => {
+                if (!deudasPorAlumno[it.nombre].some(ex => ex.concepto === d.nombre)) {
+                    deudasPorAlumno[it.nombre].push({ concepto: d.nombre, saldo: d.saldo });
+                }
+            });
+        }
+
         const bloqueSaldo = (it.tipo !== 'EXCEPCIONAL') ? `
             <div style="font-size: 8pt; margin-top: 2px;">
                 SALDO PENDIENTE: S/ ${saldoRestante.toFixed(2)}
             </div>` : '';
 
+        const infoAcademica = (it.nivel && it.grado) 
+            ? `<div style="font-size: 7.5pt; margin-bottom: 2px;">${it.nivel} - ${it.grado} "${it.seccion}"</div>` 
+            : '';
+
         ticketHTML += `
         <div class="item">
             <div class="bold">${idx + 1}. ${it.nombre}</div>
+            ${infoAcademica}
             <div style="padding-left: 3px; font-size: 8.5pt;">
                 > ${it.nomCon}<br>
-                <span>Pagado: S/ ${it.totalInd.toFixed(2)}</span><br>
+                <span>Pagado: S/ ${parseFloat(it.totalInd).toFixed(2)}</span><br>
+                <div style="font-size: 7pt; color: #333;">
+                    (Ef: ${parseFloat(it.efectivo).toFixed(2)} | Dg: ${parseFloat(it.digital).toFixed(2)})
+                </div>
                 <div style="border-left: 2px solid #000; padding-left: 4px; margin-top:2px;">
                    ${bloqueSaldo}
-                   ${bloqueEstado} </div>
+                   ${bloqueAvance}
+                </div>
             </div>
         </div>`;
     });
 
+    let htmlSubtotales = '';
+    if (totalEfectivo > 0) htmlSubtotales += `<div>EFECTIVO: S/ ${totalEfectivo.toFixed(2)}</div>`;
+    if (totalDigital > 0) htmlSubtotales += `<div>DIGITAL: S/ ${totalDigital.toFixed(2)}</div>`;
+
     ticketHTML += `
         <div class="line" style="border-bottom-style: double;"></div>
-        <div class="center total-box bold">
-            TOTAL RECIBO: S/ ${granTotal.toFixed(2)}
-        </div>
+        <div class="subtotals">${htmlSubtotales}</div>
+        <div class="center total-box bold">TOTAL RECIBO: S/ ${granTotal.toFixed(2)}</div>
     `;
 
     if (medioDigital && medioDigital.trim() !== "") {
         ticketHTML += `
-        <div style="margin-top: 12px; font-size: 8pt; background: #eee; padding: 4px;">
+        <div style="margin-top: 8px; font-size: 8pt; background: #eee; padding: 4px;">
             <span class="bold">M. DIGITAL:</span> ${medioDigital}<br>
             <span class="bold">CÓD. OP:</span> ${codOp}
         </div>`;
     }
+    if (obs) ticketHTML += `<div style="margin-top: 8px; font-size: 7.5pt;"><b>OBS:</b> ${obs}</div>`;
 
-    if (obs) {
-        ticketHTML += `<div style="margin-top: 8px; font-size: 7.5pt;"><b>OBS:</b> ${obs}</div>`;
+    const alumnosConDeuda = Object.keys(deudasPorAlumno);
+    if (alumnosConDeuda.length > 0) {
+        ticketHTML += `<div class="deudas-box">
+            <div class="bold" style="font-size: 8pt; margin-bottom:4px; text-decoration: underline;">PAGOS PENDIENTES (ADICIONALES):</div>`;
+        alumnosConDeuda.forEach(nombre => {
+            ticketHTML += `<div style="font-size: 7pt; font-weight:bold; margin-top:4px;">${nombre}:</div>`;
+            deudasPorAlumno[nombre].forEach(d => {
+                ticketHTML += `
+                <div style="font-size: 8pt; display: flex; justify-content: space-between; padding-left: 5px;">
+                    <span>• ${d.concepto}</span>
+                    <span class="bold">S/ ${parseFloat(d.saldo).toFixed(2)}</span>
+                </div>`;
+            });
+        });
+        ticketHTML += `</div>`;
     }
 
     ticketHTML += `
         <div class="line"></div>
         <div class="center" style="font-size: 8.5pt; margin-top: 15px;">
-            ***Gracias por su compromiso y responsabilidad.***<br>
-            <span style="font-size: 7pt;">Este es un comprobante interno de pago.</span>
+            ***Gracias por su compromiso.***<br>
+            <span style="font-size: 7pt;">Comprobante de control interno.</span>
         </div>
         <div style="height: 30px;"></div>
     </body>
@@ -4390,13 +4574,20 @@ function imprimirTicket(nroRecibo, datosBorrador, medioDigital, codOp, obs) {
     doc.open();
     doc.write(ticketHTML);
     doc.close();
-
     iframe.contentWindow.focus();
+    
+    // --- OPTIMIZACIÓN DE TIEMPO ---
+    // Reducimos el delay de 1000ms a solo 150ms.
     setTimeout(() => {
         iframe.contentWindow.print();
-    }, 1000);
+        // Eliminamos el iframe después de 2 segundos (tiempo suficiente para que el driver de impresión tome el control)
+        setTimeout(() => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+        }, 2000);
+    }, 150); // <-- ESTE ES EL CAMBIO CLAVE (De 1000 a 150)
 }
-
 
 /*--------------------------------------------------------------------------*/
 //BUSCAR RECIBOS
@@ -4459,7 +4650,6 @@ function renderRecibosView() {
     cargarUltimosRecibos();
 }
 
-
 async function buscarReciboFinal() {
     const input = document.getElementById('bus-nro-recibo');
     const btn = document.querySelector('.card-busqueda .btn-primary') || document.querySelector('button[onclick="buscarReciboFinal()"]');
@@ -4474,15 +4664,16 @@ async function buscarReciboFinal() {
         btn.innerHTML = '<i class="material-icons rotate">sync</i> BUSCANDO';
     }
     
-    // Mostramos un mensaje temporal en el área de resultados
     area.style.display = 'block';
     area.innerHTML = '<div style="text-align:center; padding:20px; color:var(--primary-blue); font-weight:700;">Consultando base de datos...</div>';
 
     try {
+        // --- CORRECCIÓN CLAVE: El nombre debe ser 'buscarRecibo' para coincidir con el doPost ---
+        // Y enviamos el parámetro como un objeto { nroRecibo: nro }
         const res = await sendRequest('buscarRecibo', { nroRecibo: nro });
 
         if (res.status === 'success') {
-            const d = res.data; // Array con los registros del recibo
+            const d = res.data; 
             
             area.innerHTML = `
                 <div class="animate__animated animate__fadeIn" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:24px; padding:30px;">
@@ -4507,7 +4698,7 @@ async function buscarReciboFinal() {
                         <table style="width:100%; border-collapse:collapse;">
                             <thead style="background:#f1f5f9; color:var(--primary-dark); text-align:left;">
                                 <tr>
-                                    <th style="padding:15px;">ESTUDIANTE</th>
+                                    <th style="padding:15px;">ESTUDIANTE / GRADO</th>
                                     <th style="padding:15px;">CONCEPTO</th>
                                     <th style="padding:15px; text-align:right;">PAGO TOTAL</th>
                                 </tr>
@@ -4515,11 +4706,20 @@ async function buscarReciboFinal() {
                             <tbody>
                                 ${d.map(it => {
                                     const totalVal = parseFloat(it.totalInd) || 0;
+                                    const infoAcademica = (it.nivel && it.grado)
+                                        ? `<div style="font-size:0.75rem; color:var(--primary-blue); font-weight:700; text-transform:uppercase; margin-top:2px;">
+                                             ${it.nivel} - ${it.grado} "${it.seccion}"
+                                           </div>`
+                                        : '<div style="font-size:0.75rem; color:#94a3b8;">S/ INFO ACADÉMICA</div>';
+
                                     return `
                                         <tr style="border-bottom:1px solid #f1f5f9;">
-                                            <td style="padding:15px; font-weight:700;">${it.nombre}</td>
-                                            <td style="padding:15px; color:var(--text-muted);">${it.nomCon}</td>
-                                            <td style="padding:15px; text-align:right; font-weight:800; color:var(--primary-blue);">
+                                            <td style="padding:15px;">
+                                                <div style="font-weight:700; color:var(--text-main);">${it.nombre}</div>
+                                                ${infoAcademica}
+                                            </td>
+                                            <td style="padding:15px; color:var(--text-muted); font-size:0.9rem;">${it.nomCon}</td>
+                                            <td style="padding:15px; text-align:right; font-weight:800; color:var(--primary-blue); font-size:1.1rem;">
                                                 S/ ${totalVal.toFixed(2)}
                                             </td>
                                         </tr>`;
@@ -4538,7 +4738,6 @@ async function buscarReciboFinal() {
         area.style.display = 'none';
         lanzarNotificacion('error', 'SISTEMA', 'Error al conectar con el servidor.');
     } finally {
-        // 2. Restaurar botón
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = '<i class="material-icons">search</i> BUSCAR';
@@ -4547,25 +4746,15 @@ async function buscarReciboFinal() {
 }
 
 function reimprimirDesdeBusqueda(datos, nro) {
-    // 1. MOSTRAR CARGA Y BLOQUEAR PANTALLA
-    // Esto evita que el usuario presione el botón varias veces mientras se genera el iframe
-    lanzarNotificacion('loading', 'IMPRESORA', 'Generando vista previa...');
-
-    // 2. Extraemos los metadatos comunes
+    // Los datos que vienen aquí desde el buscador YA tienen 'avancePensiones' y 'deudasAdicionales'
+    // gracias a la actualización que hicimos en el código del servidor (buscarReciboPorNro).
+    
     const medio = datos[0].medio;
     const codOp = datos[0].codOp;
     const obs = datos[0].obs;
     
-    // 3. Invocamos tu función de impresión
-    // (Recuerda que esta función tiene un setTimeout interno de 1000ms)
+    // Invocamos la función de impresión actualizada
     imprimirTicket(nro, datos, medio, codOp, obs);
-
-    // 4. CERRAR CARGA SINCRONIZADA
-    // Cerramos la notificación un poco después (1.2 seg) para que coincida 
-    // justo cuando aparece el diálogo de impresión del navegador.
-    setTimeout(() => {
-        cerrarNotify();
-    }, 1200);
 }
 
 
@@ -4574,6 +4763,7 @@ function reimprimirDesdeBusqueda(datos, nro) {
 // --- VARIABLES GLOBALES DEL MÓDULO ---
 let listaEstudiantesGlobal = []; // Para el buscador local
 let historialCache = [];         // Para ver detalles sin volver a pedir al servidor
+let pendientesCache = [];
 
 /* --- ACTUALIZAR EN SCRIPT.JS --- */
 
@@ -4626,6 +4816,12 @@ function renderHistorialPagosView() {
             <div style="padding: 15px 20px; background: #2563eb; color: white; display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin:0; font-size: 1.1rem; color: white;" id="hist-student-name">Estudiante Seleccionado</h3>
                 <span class="badge" style="background: white; color: #2563eb;" id="hist-count">0 Operaciones</span>
+            </div>
+
+            <div id="hist-info-academica" style="display: flex; gap: 15px; margin-bottom: 10px;">
+                <div><strong>Nivel:</strong> <span id="hist-txt-nivel">---</span></div>
+                <div><strong>Grado:</strong> <span id="hist-txt-grado">---</span></div>
+                <div><strong>Sección:</strong> <span id="hist-txt-seccion">---</span></div>
             </div>
             
             <table class="data-table">
@@ -4769,9 +4965,21 @@ async function cargarTablaHistorial() {
         if (res.status === 'success') {
             const pagos = res.pagos || [];
             const deudas = res.pendientes || [];
-            historialCache = pagos;
+            
+            // --- ACTUALIZACIÓN DE CACHÉ GLOBAL ---
+            historialCache = pagos; 
+            pendientesCache = deudas; 
 
-            document.getElementById('hist-count').innerText = `${pagos.length} Pagos | ${deudas.length} Pendientes`;
+            // --- ACTUALIZACIÓN SEGURA (Sin errores si no existe el ID) ---
+            const elNivel = document.getElementById('hist-txt-nivel');
+            const elGrado = document.getElementById('hist-txt-grado');
+            const elSecc  = document.getElementById('hist-txt-seccion');
+            const elCount = document.getElementById('hist-count');
+
+            if (elNivel) elNivel.innerText = res.nivel || '---';
+            if (elGrado) elGrado.innerText = res.grado || '---';
+            if (elSecc)  elSecc.innerText  = res.seccion || '---';
+            if (elCount) elCount.innerText = `${pagos.length} Pagos | ${deudas.length} Pendientes`;
 
             if (pagos.length === 0 && deudas.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">Sin movimientos registrados.</td></tr>`;
@@ -4780,7 +4988,7 @@ async function cargarTablaHistorial() {
 
             let html = "";
 
-            // 1. SECCIÓN DE DEUDAS (PENDIENTES) - Resaltado
+            // 1. SECCIÓN DE DEUDAS (PENDIENTES)
             if (deudas.length > 0) {
                 html += `
                 <tr style="background-color: #fef2f2; border-bottom: 2px solid #fee2e2;">
@@ -5488,30 +5696,15 @@ async function cargarUltimosRecibos() {
     }
 }
 
-// --- FUNCIÓN OPTIMIZADA: REIMPRESIÓN INSTANTÁNEA ---
+//Siempre consulta al servidor. Es la única forma de garantizar que salgan las deudas pendientes.
 function reimprimirDirecto(nro) {
-    // Verificamos si tenemos los datos en caché
-    const datosCache = cacheUltimosRecibos[nro];
-
-    if (datosCache) {
-        // ¡SÍ ESTÁN! Imprimimos directo sin ir al servidor (0ms delay)
-        lanzarNotificacion('loading', 'IMPRESORA', 'Generando ticket...');
-        
-        const medio = datosCache[0].medio;
-        const codOp = datosCache[0].codOp;
-        const obs = datosCache[0].obs;
-
-        // Ejecutamos la impresión
-        imprimirTicket(nro, datosCache, medio, codOp, obs);
-
-        // Cerramos la notificación un poco después para dar efecto visual
-        setTimeout(() => cerrarNotify(), 800);
-
-    } else {
-        // FALLBACK: Si por alguna razón no está en caché (raro), vamos al servidor
-        console.warn("Dato no en caché, solicitando al servidor...");
-        reimprimirDesdeServidor(nro); 
-    }
+    // CAMBIO CRUCIAL:
+    // Ignoramos 'datosCache' intencionalmente.
+    // La caché de la tabla suele ser "ligera" y no tiene los cálculos de 
+    // Deudas Adicionales ni Avance de Pensiones.
+    // Para que el ticket salga completo, debemos pedir datos frescos al servidor.
+    
+    reimprimirDesdeServidor(nro);
 }
 
 // --- FUNCIÓN OPTIMIZADA: VISTA DETALLE INSTANTÁNEA ---
@@ -5589,12 +5782,13 @@ function construirModalDetalle(nro, items) {
     mostrarModal(`DETALLE DE RECIBO N° ${nro}`, html);
 }
 
-// Fallbacks (Solo por si acaso se limpó la caché)
+
 async function reimprimirDesdeServidor(nro) {
     lanzarNotificacion('loading', 'SISTEMA', 'Recuperando datos...');
     try {
         const res = await sendRequest('buscarRecibo', { nroRecibo: nro });
-        cerrarNotify();
+        cerrarNotify(); // Cerramos INMEDIATAMENTE al recibir respuesta
+        
         if (res.status === 'success') {
             const d = res.data;
             imprimirTicket(nro, d, d[0].medio, d[0].codOp, d[0].obs);
@@ -6570,7 +6764,7 @@ async function enviarSolicitudAcceso(idRecibido) {
 }
 
 /*------------------------------------------------------------------------*/
-/* --- FUNCIÓN PARA GENERAR REPORTE A4 --- */
+/* --- FUNCIÓN PARA GENERAR LISTA A4 --- */
 
 function imprimirListaSeccion() {
     // 1. Capturar datos de encabezado
@@ -6783,8 +6977,6 @@ function imprimirListaSeccion() {
 let cacheReportePagos = {}; // Para guardar los datos descargados
 let tabReporteActual = 'REGULAR'; // 'REGULAR' o 'ADICIONAL'
 
-/* --- REEMPLAZA TU FUNCIÓN ACTUAL CON ESTA VERSIÓN ROBUSTA --- */
-
 function renderReportesPagosView() {
     // 1. Verificar Permisos
     if (!['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role)) {
@@ -6792,84 +6984,124 @@ function renderReportesPagosView() {
         return;
     }
 
-    // 2. CORRECCIÓN CRÍTICA: Resetear siempre a 'REGULAR' al abrir para evitar desincronización
     tabReporteActual = 'REGULAR'; 
 
     const content = document.getElementById('content-area');
     content.innerHTML = `
         <div class="module-header">
-            <h2>Reporte de Pagos y Deudas</h2>
-            <p>Estado de cuenta por sección y concepto.</p>
+            <div>
+                <h2>Reporte de Pagos y Deudas</h2>
+                <p>Estado de cuenta en tiempo real por aula.</p>
+            </div>
+            <div style="background: #e0f2fe; color: #0284c7; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9rem;">
+                <i class="material-icons" style="font-size: 16px; vertical-align: text-top;">insights</i> Análisis Financiero
+            </div>
         </div>
 
-        <div class="tabs-container" style="margin-bottom: 20px; display: flex; gap: 15px;">
-            
+        <div class="tabs-container" style="margin-bottom: 20px; display: flex; gap: 15px; background: white; padding: 5px; border-radius: 12px; border: 1px solid #e2e8f0;">
             <button id="btn-tab-reg" class="tab-button active" onclick="cambiarTabReporte('REGULAR')" 
-                    style="flex: 1; padding: 15px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;">
-                <i class="material-icons" style="font-size: 24px;">school</i> 
-                <span>CONCEPTOS REGULARES</span>
+                    style="flex: 1; border-radius: 8px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="material-icons">school</i> CONCEPTOS REGULARES
             </button>
-            
             <button id="btn-tab-adi" class="tab-button" onclick="cambiarTabReporte('ADICIONAL')" 
-                    style="flex: 1; padding: 15px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;">
-                <i class="material-icons" style="font-size: 24px;">local_activity</i> 
-                <span>CONCEPTOS ADICIONALES</span>
+                    style="flex: 1; border-radius: 8px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="material-icons">local_activity</i> CONCEPTOS ADICIONALES
             </button>
-
         </div>
 
-        <div class="card-config" style="background:white; padding:15px; border-radius:12px; margin-bottom:20px; border-left: 4px solid #2563eb;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; align-items: flex-end;">
+        <div class="card-config" style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+    
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
                 
-                <div>
-                    <label class="form-label">Año Académico</label>
-                    <select id="rep-anio" class="form-input" disabled>
+                <div style="width: 100px;">
+                    <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Año</label>
+                    <select id="rep-anio" class="form-input" disabled style="background: #f8fafc;">
                         <option value="${anioActivoID}">${anioActivoNombre}</option>
                     </select>
                 </div>
+
+                <div style="width: 140px;">
+                    <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Nivel</label>
+                    <select id="rep-nivel" class="form-input" onchange="alCambiarNivelReporte()"></select>
+                </div>
+
+                <div style="width: 140px;">
+                    <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Grado</label>
+                    <select id="rep-grado" class="form-input" onchange="alCambiarGradoReporte()"></select>
+                </div>
+
+                <div style="width: 100px;">
+                    <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Sección</label>
+                    <select id="rep-seccion" class="form-input" onchange="alCambiarSeccionReporte()"></select>
+                </div>
                 
-                <div><label class="form-label">Nivel</label><select id="rep-nivel" class="form-input" onchange="alCambiarNivelReporte()"></select></div>
-                <div><label class="form-label">Grado</label><select id="rep-grado" class="form-input" onchange="alCambiarGradoReporte()"></select></div>
-                <div><label class="form-label">Sección</label><select id="rep-seccion" class="form-input" onchange="alCambiarSeccionReporte()"></select></div>
-                
-                <div style="flex-grow: 2;">
-                    <label class="form-label" style="color:#2563eb;">Concepto a Evaluar</label>
-                    <select id="rep-concepto" class="form-input" style="font-weight:bold; border-color:#2563eb;" onchange="generarReporteDeuda()"></select>
+                <div style="flex-grow: 1; min-width: 250px;">
+                    <label class="form-label" style="color:#2563eb; font-weight: 700;">Seleccione Concepto a Evaluar</label>
+                    <select id="rep-concepto" class="form-input" style="border: 2px solid #bfdbfe; font-weight: 600; color: #1e293b;" onchange="generarReporteDeuda()"></select>
                 </div>
 
             </div>
         </div>
 
-        <div class="report-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
-            <div class="dash-card" style="border-top: 4px solid #ef4444; padding:0; overflow:hidden;">
-                <div style="padding:15px; background:#fef2f2; border-bottom:1px solid #fee2e2; display:flex; justify-content:space-between;">
-                    <strong style="color:#991b1b;">PENDIENTES DE PAGO</strong>
-                    <span id="count-deuda" class="badge" style="background:#fee2e2; color:#991b1b;">0</span>
+        <div style="display: flex; gap: 25px; align-items: flex-start; width: 100%;">
+            
+            <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                
+                <div style="background: #fee2e2; padding: 12px 20px; border-radius: 12px 12px 0 0; border: 1px solid #fecaca; border-bottom: none; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="background: white; padding: 4px; border-radius: 50%; display: flex;"><i class="material-icons" style="color: #ef4444; font-size: 18px;">warning</i></div>
+                        <span style="color: #991b1b; font-weight: 800; font-size: 0.95rem; letter-spacing: 0.5px;">PENDIENTES DE PAGO</span>
+                    </div>
+                    <span id="count-deuda" style="background: #ef4444; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">0</span>
                 </div>
-                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
-                    <table class="data-table">
-                        <thead><tr><th>Estudiante</th><th style="text-align:right;">Deuda</th></tr></thead>
-                        <tbody id="body-deuda"><tr><td colspan="2" style="text-align:center; color:#94a3b8;">Seleccione concepto...</td></tr></tbody>
-                    </table>
+                
+                <div style="background: white; border: 1px solid #e2e8f0; border-top: 3px solid #ef4444; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div class="table-container" style="max-height: 600px; overflow-y: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                            <thead style="position: sticky; top: 0; background: white; z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <tr>
+                                    <th style="padding: 15px 20px; text-align: left; color: #ffffff; font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">Estudiante</th>
+                                    <th style="padding: 15px 20px; text-align: right; color: #ffffff; font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">Saldo Pendiente</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-deuda">
+                                <tr><td colspan="2" style="text-align:center; padding: 40px; color: #94a3b8; font-style: italic;">Seleccione un concepto para ver resultados.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="dash-card" style="border-top: 4px solid #10b981; padding:0; overflow:hidden;">
-                <div style="padding:15px; background:#f0fdf4; border-bottom:1px solid #dcfce7; display:flex; justify-content:space-between;">
-                    <strong style="color:#166534;">AL DÍA (PAGADO)</strong>
-                    <span id="count-pagado" class="badge" style="background:#dcfce7; color:#166534;">0</span>
+            <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                
+                <div style="background: #dcfce7; padding: 12px 20px; border-radius: 12px 12px 0 0; border: 1px solid #bbf7d0; border-bottom: none; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="background: white; padding: 4px; border-radius: 50%; display: flex;"><i class="material-icons" style="color: #10b981; font-size: 18px;">check_circle</i></div>
+                        <span style="color: #166534; font-weight: 800; font-size: 0.95rem; letter-spacing: 0.5px;">AL DÍA (PAGADO)</span>
+                    </div>
+                    <span id="count-pagado" style="background: #16a34a; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3);">0</span>
                 </div>
-                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
-                    <table class="data-table">
-                        <thead><tr><th>Estudiante</th><th>Recibo</th></tr></thead>
-                        <tbody id="body-pagado"><tr><td colspan="2" style="text-align:center; color:#94a3b8;">Esperando datos...</td></tr></tbody>
-                    </table>
+                
+                <div style="background: white; border: 1px solid #e2e8f0; border-top: 3px solid #10b981; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div class="table-container" style="max-height: 600px; overflow-y: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                            <thead style="position: sticky; top: 0; background: white; z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <tr>
+                                    <th style="padding: 15px 20px; text-align: left; color: #ffffff; font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">Estudiante</th>
+                                    <th style="padding: 15px 20px; text-align: center; color: #ffffff; font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">Ref. Recibo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-pagado">
+                                <tr><td colspan="2" style="text-align:center; padding: 40px; color: #94a3b8; font-style: italic;">Esperando selección...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
         </div>
     `;
 
-    // Cargar datos
     cargarDatosInicialesReporte();
 }
 
@@ -6928,6 +7160,7 @@ function actualizarComboConceptos() {
     ).join('');
 }
 
+/*
 function generarReporteDeuda() {
     const idSec = document.getElementById('rep-seccion').value;
     const idCon = document.getElementById('rep-concepto').value;
@@ -6938,43 +7171,31 @@ function generarReporteDeuda() {
     const countPagado = document.getElementById('count-pagado');
 
     if (!idSec || !idCon) {
-        bodyDeuda.innerHTML = '<tr><td colspan="2" style="text-align:center;">Faltan filtros</td></tr>';
-        bodyPagado.innerHTML = '<tr><td colspan="2" style="text-align:center;">Faltan filtros</td></tr>';
+        const msg = '<tr><td colspan="2" style="text-align:center; padding:30px; color:#cbd5e1;">Faltan filtros</td></tr>';
+        bodyDeuda.innerHTML = msg; bodyPagado.innerHTML = msg;
         return;
     }
 
-    // 1. Obtener precio base del concepto
     const conceptoObj = cacheReportePagos.conceptos.find(c => String(c.id) === String(idCon));
     const precioBase = conceptoObj ? parseFloat(conceptoObj.monto) : 0;
-
-    // 2. Obtener alumnos de la sección
     const matriculados = cacheReportePagos.matriculas.filter(m => String(m.idSec) === String(idSec));
 
     let listaDeuda = [];
     let listaPagado = [];
 
-    // 3. PROCESAR CADA ALUMNO
     matriculados.forEach(mat => {
         const est = cacheReportePagos.estudiantes.find(e => String(e.id) === String(mat.idEst));
         if (!est) return;
 
-        // A. Calcular Descuentos
-        const misDescuentos = cacheReportePagos.descuentos
-            .filter(d => String(d.idEst) === String(mat.idEst) && String(d.idCon) === String(idCon));
+        const misDescuentos = cacheReportePagos.descuentos.filter(d => String(d.idEst) === String(mat.idEst) && String(d.idCon) === String(idCon));
         const totalDescuento = misDescuentos.reduce((sum, d) => sum + parseFloat(d.monto), 0);
-
-        // B. Calcular Pagos Realizados
-        const misPagos = cacheReportePagos.pagos
-            .filter(p => String(p.idEst) === String(mat.idEst) && String(p.idCon) === String(idCon));
+        const misPagos = cacheReportePagos.pagos.filter(p => String(p.idEst) === String(mat.idEst) && String(p.idCon) === String(idCon));
         const totalPagado = misPagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
 
-        // C. Calcular Deuda Final
         const montoA_Pagar = precioBase - totalDescuento;
         const deuda = montoA_Pagar - totalPagado;
-
         const ultimoRecibo = misPagos.length > 0 ? misPagos[misPagos.length - 1].recibo : '---';
 
-        // D. Clasificar (Margen de error de 0.1 para decimales)
         if (deuda > 0.1) {
             listaDeuda.push({ nombre: est.nombre, deuda: deuda });
         } else {
@@ -6982,25 +7203,169 @@ function generarReporteDeuda() {
         }
     });
 
-    // 4. Renderizar DEUDORES
+    // RENDER DEUDORES
     listaDeuda.sort((a,b) => a.nombre.localeCompare(b.nombre));
     countDeuda.innerText = listaDeuda.length;
     bodyDeuda.innerHTML = listaDeuda.length ? listaDeuda.map(item => `
-        <tr>
-            <td style="font-size:12px;">${item.nombre}</td>
-            <td style="text-align:right; font-weight:bold; color:#ef4444;">S/ ${item.deuda.toFixed(2)}</td>
+        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; text-align:right; font-weight: 700; color: #ef4444; font-family: monospace; font-size: 1.1rem;">S/ ${item.deuda.toFixed(2)}</td>
         </tr>
-    `).join('') : '<tr><td colspan="2" style="text-align:center; color:#166534;"><i class="material-icons">check</i> Nadie debe</td></tr>';
+    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#16a34a; background:#f0fdf4;"><i class="material-icons" style="font-size:30px; display:block; margin-bottom:5px;">thumb_up_alt</i>¡Excelente! Todos han pagado.</td></tr>`;
 
-    // 5. Renderizar PAGADOS
+    // RENDER PAGADOS
     listaPagado.sort((a,b) => a.nombre.localeCompare(b.nombre));
     countPagado.innerText = listaPagado.length;
     bodyPagado.innerHTML = listaPagado.length ? listaPagado.map(item => `
-        <tr>
-            <td style="font-size:12px;">${item.nombre}</td>
-            <td style="text-align:center; font-family:monospace; color:#166534; background:#dcfce7; border-radius:4px; padding:2px;">${item.recibo}</td>
+        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; text-align:center;">
+                <span style="font-family:monospace; color:#15803d; background:#dcfce7; padding: 3px 8px; border-radius: 6px; font-weight:600; font-size: 1.1rem;">
+                    <i class="material-icons" style="font-size:12px; vertical-align:middle;">receipt</i> ${item.recibo}
+                </span>
+            </td>
         </tr>
-    `).join('') : '<tr><td colspan="2" style="text-align:center; color:#94a3b8;">Nadie ha pagado</td></tr>';
+    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#94a3b8;">Ningún pago registrado aún.</td></tr>`;
+}
+*/
+
+function generarReporteDeuda() {
+    const idSec = document.getElementById('rep-seccion').value;
+    const idCon = document.getElementById('rep-concepto').value;
+    
+    const bodyDeuda = document.getElementById('body-deuda');
+    const bodyPagado = document.getElementById('body-pagado');
+    const countDeuda = document.getElementById('count-deuda');
+    const countPagado = document.getElementById('count-pagado');
+
+    if (!idSec || !idCon) {
+        const msg = '<tr><td colspan="2" style="text-align:center; padding:30px; color:#cbd5e1;">Faltan filtros</td></tr>';
+        bodyDeuda.innerHTML = msg; bodyPagado.innerHTML = msg;
+        return;
+    }
+
+    const conceptoObj = cacheReportePagos.conceptos.find(c => String(c.id) === String(idCon));
+    const precioBase = conceptoObj ? parseFloat(conceptoObj.monto) : 0;
+    const matriculados = cacheReportePagos.matriculas.filter(m => String(m.idSec) === String(idSec));
+
+    let listaDeuda = [];
+    let listaPagado = [];
+
+    matriculados.forEach(mat => {
+        const est = cacheReportePagos.estudiantes.find(e => String(e.id) === String(mat.idEst));
+        if (!est) return;
+
+        const misDescuentos = cacheReportePagos.descuentos.filter(d => String(d.idEst) === String(mat.idEst) && String(d.idCon) === String(idCon));
+        const totalDescuento = misDescuentos.reduce((sum, d) => sum + parseFloat(d.monto), 0);
+        const misPagos = cacheReportePagos.pagos.filter(p => String(p.idEst) === String(mat.idEst) && String(p.idCon) === String(idCon));
+        const totalPagado = misPagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+
+        const montoA_Pagar = precioBase - totalDescuento;
+        const deuda = montoA_Pagar - totalPagado;
+        const ultimoRecibo = misPagos.length > 0 ? misPagos[misPagos.length - 1].recibo : '---';
+
+        if (deuda > 0.1) {
+            listaDeuda.push({ nombre: est.nombre, deuda: deuda });
+        } else {
+            // AQUÍ GUARDAMOS TAMBIÉN EL ID DEL ESTUDIANTE PARA EL MODAL
+            listaPagado.push({ 
+                idEst: est.id, 
+                nombre: est.nombre, 
+                recibo: misPagos.length > 1 ? 'Varios' : ultimoRecibo,
+                count: misPagos.length 
+            });
+        }
+    });
+
+    // RENDER DEUDORES
+    listaDeuda.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    countDeuda.innerText = listaDeuda.length;
+    bodyDeuda.innerHTML = listaDeuda.length ? listaDeuda.map(item => `
+        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+            <td style="padding: 12px 20px; color: #334155; font-size: 0.95rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; text-align:right; font-weight: 700; color: #ef4444; font-family: monospace; font-size: 0.95rem;">S/ ${item.deuda.toFixed(2)}</td>
+        </tr>
+    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#16a34a; background:#f0fdf4;"><i class="material-icons" style="font-size:30px; display:block; margin-bottom:5px;">thumb_up_alt</i>¡Excelente! Todos han pagado.</td></tr>`;
+
+    // RENDER PAGADOS (Con botón Modal)
+    listaPagado.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    countPagado.innerText = listaPagado.length;
+    bodyPagado.innerHTML = listaPagado.length ? listaPagado.map(item => `
+        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+            <td style="padding: 12px 20px; color: #334155; font-size: 0.95rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; text-align:center;">
+                <button onclick="verDetallePagosReporte('${item.idEst}', '${idCon}', '${item.nombre}')" 
+                   style="font-family:monospace; color:#15803d; background:#dcfce7; padding: 5px 10px; border: 1px solid #86efac; border-radius: 6px; font-weight:600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="material-icons" style="font-size:14px;">receipt</i> ${item.recibo} ${item.count > 1 ? '<i class="material-icons" style="font-size:12px; margin-left:2px;">more_horiz</i>' : ''}
+                </button>
+            </td>
+        </tr>
+    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#94a3b8;">Ningún pago registrado aún.</td></tr>`;
+}
+
+function verDetallePagosReporte(idEst, idCon, nombreEstudiante) {
+    // 1. Filtrar los pagos de este alumno para este concepto
+    const pagosFiltrados = cacheReportePagos.pagos
+        .filter(p => String(p.idEst) === String(idEst) && String(p.idCon) === String(idCon))
+        .sort((a,b) => b.recibo - a.recibo); // Ordenar por recibo descendente
+
+    // 2. Obtener nombre del concepto
+    const conceptoObj = cacheReportePagos.conceptos.find(c => String(c.id) === String(idCon));
+    const nombreConcepto = conceptoObj ? conceptoObj.nombre : "Concepto";
+
+    // 3. Construir HTML del Modal
+    const contenido = `
+        <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: bold; text-transform: uppercase;">Estudiante</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">${nombreEstudiante}</div>
+            <div style="margin-top: 8px; font-size: 0.85rem; color: #64748b; font-weight: bold; text-transform: uppercase;">Concepto</div>
+            <div style="font-size: 1rem; color: #2563eb;">${nombreConcepto}</div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Recibo</th>
+                        <th>Fecha</th>
+                        <th>Medio</th>
+                        <th style="text-align:right;">Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${pagosFiltrados.map(p => `
+                    <tr>
+                        <td style="font-weight:bold; font-family:monospace;">${p.recibo}</td>
+                        <td style="font-size:0.9rem;">${p.fecha.split(' ')[0]} <br> <span style="font-size:1.1rem; color:#666;">${p.fecha.split(' ')[1] || ''}</span></td>
+                        <td style="font-size:1.1rem;">
+                            ${p.medio ? p.medio : 'EFECTIVO'} 
+                            ${p.codOp ? `<br><span style="font-size:1.1rem; color:#666; font-family:monospace;">Ref: ${p.codOp}</span>` : ''}
+                        </td>
+                        <td style="text-align:right; font-weight:bold; color:#166534;">S/ ${p.monto.toFixed(2)}</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="background-color: #f8fafc; border-top: 2px solid #e2e8f0;">
+                        <td colspan="3" style="text-align:right; font-weight:bold;">TOTAL PAGADO:</td>
+                        <td style="text-align:right; font-weight:bold; color:#166534; font-size:1.1rem;">
+                            S/ ${pagosFiltrados.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div style="margin-top: 15px; text-align: right; font-size: 0.8rem; color: #94a3b8; font-style: italic;">
+            Datos recuperados del reporte actual.
+        </div>
+        
+        <div style="margin-top: 20px; text-align: right;">
+            <button class="btn-cancel" onclick="cerrarModal()">Cerrar</button>
+        </div>
+    `;
+
+    mostrarModal('Detalle de Pagos', contenido);
 }
 
 /* FUNCIONES AUXILIARES PARA LOS SELECTS (Si no las tienes globales) */
@@ -7142,162 +7507,217 @@ function actualizarComboConceptos() {
 }
 
 
-/*------DESCARGAR TICKET PDF------------------*/
+
+
+/*------DESCARGAR TICKET PDF (ALTO DE PRECISIÓN)----------*/
 function descargarTicketPDF(datosBorrador, nroRecibo) {
     lanzarNotificacion('loading', 'PDF', 'Generando archivo...');
 
-    // 1. Datos Generales
-    // Si datosBorrador[0].fecha existe (viene del buscador), la usamos.
-    // Si no existe (es un recibo nuevo), generamos la fecha actual.
-    const fechaEmision = datosBorrador[0].fecha && datosBorrador[0].fecha !== "---" 
-        ? datosBorrador[0].fecha 
-        : new Date().toLocaleString('es-PE', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
-    // -----------------------
-    const medioDigital = datosBorrador[0].medio;
-    const codOp = datosBorrador[0].codOp;
-    const obs = datosBorrador[0].obs;
-    const granTotal = datosBorrador.reduce((sum, it) => sum + parseFloat(it.totalInd), 0);
-    const logoUrl = 'https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png';
+    try {
+        if (!datosBorrador || datosBorrador.length === 0) throw new Error("Sin datos.");
 
-    // 2. Construir el Contenedor
-    const element = document.createElement('div');
-    element.style.width = '260px'; 
-    element.style.fontFamily = "'Courier New', Courier, monospace";
-    element.style.fontSize = '11px';
-    element.style.padding = '15px';
-    element.style.color = '#000';
-    element.style.backgroundColor = '#fff';
+        const logoUrl = 'https://i.postimg.cc/W45SpCYb/insignia-azul-sello.png';
+        const medioDigital = datosBorrador[0].medio || "";
+        const codOp = datosBorrador[0].codOp || "";
+        const obs = datosBorrador[0].obs || "";
 
-    let htmlContent = `
-        <div style="text-align: center;">
-            <img src="${logoUrl}" crossorigin="anonymous" width="60" style="filter: grayscale(1); display: block; margin: 0 auto;"><br>
-            <strong style="font-size: 12px;">I.E.P. Ciencias Aplicadas<br>Sir Isaac Newton</strong><br>
-            <strong>RUC: 20455855226</strong><br>
-            <span style="font-size: 9px;">Calle Aurelio de la Fuente N° 102-104</span><br>
-            <div style="border-bottom: 1px dashed #000; margin: 5px 0;"></div>
-            <strong style="font-size: 13px;">RECIBO N° ${nroRecibo}</strong><br>
-            <span>Emisión: ${fechaEmision}</span>
-        </div>
-        <div style="border-bottom: 1px dashed #000; margin: 5px 0;"></div>
-        <div style="font-weight: bold; margin-bottom: 8px;">DETALLE DE PAGO:</div>
-    `;
+        let fechaEmision = (datosBorrador[0].fecha && String(datosBorrador[0].fecha).includes(':')) 
+            ? datosBorrador[0].fecha 
+            : new Date().toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    datosBorrador.forEach((it, idx) => {
-        // --- LÓGICA DE CÁLCULO DE RETRASO ---
-        let textoEstado = "";
-        if (it.fechaProg) {
-            const fechaProg = new Date(it.fechaProg);
-            const hoy = new Date();
-            
-            // Normalizar a medianoche
-            hoy.setHours(0,0,0,0);
-            fechaProg.setHours(0,0,0,0);
-            
-            if (!isNaN(fechaProg.getTime())) {
-                const diffTime = hoy - fechaProg;
-                const diasAtraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                if (diasAtraso > 0) {
-                    textoEstado = `<div style="font-weight:bold;">Días de retraso: ${diasAtraso}</div>`;
-                } else {
-                    textoEstado = `<div style="font-style:italic;">Pago puntual.</div>`;
-                }
+        const totalEfectivo = datosBorrador.reduce((sum, it) => sum + (parseFloat(it.efectivo) || 0), 0);
+        const totalDigital = datosBorrador.reduce((sum, it) => sum + (parseFloat(it.digital) || 0), 0);
+        const granTotal = totalEfectivo + totalDigital;
+
+        // --- 1. CONTENEDOR OPTIMIZADO ---
+        const element = document.createElement('div');
+        element.style.width = '80mm'; 
+        element.style.padding = '5mm 4mm 15mm 4mm'; // Aumentamos padding inferior a 15mm para proteger el footer
+        element.style.boxSizing = 'border-box';
+        element.style.fontFamily = "'Courier New', Courier, monospace";
+        element.style.fontSize = '10pt';
+        element.style.lineHeight = '1.3';
+        element.style.color = '#000';
+        element.style.backgroundColor = '#fff';
+
+        let deudasPorAlumno = {};
+
+        let htmlContent = `
+            <div style="text-align: center;">
+                <img src="${logoUrl}" crossorigin="anonymous" width="60" style="filter: grayscale(1); display: block; margin: 0 auto 4px auto;">
+                <strong style="font-size: 10pt; display: block; line-height: 1.1;">I.E.P. CIENCIAS APLICADAS<br>SIR ISAAC NEWTON</strong>
+                <strong style="display: block; margin-top: 2px;">RUC: 20455855226</strong>
+                <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
+                <strong style="font-size: 14px;">RECIBO N° ${nroRecibo}</strong><br>
+                <span style="font-size: 9pt;">Emisión: ${fechaEmision}</span>
+            </div>
+            <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="font-weight: bold; margin-bottom: 5px;">DETALLE DE PAGO:</div>
+        `;
+
+        datosBorrador.forEach((it, idx) => {
+            const montoInd = parseFloat(it.totalInd || 0);
+            const saldoP = parseFloat(it.saldoPrevio || 0);
+            const saldoRestante = saldoP - montoInd;
+
+            if (it.deudasAdicionales && it.deudasAdicionales.length > 0) {
+                if (!deudasPorAlumno[it.nombre]) deudasPorAlumno[it.nombre] = [];
+                it.deudasAdicionales.forEach(d => {
+                    if (!deudasPorAlumno[it.nombre].some(ex => ex.concepto === d.nombre)) {
+                        deudasPorAlumno[it.nombre].push({ concepto: d.nombre, saldo: d.saldo });
+                    }
+                });
             }
+
+            htmlContent += `
+            <div style="margin-bottom: 10px;">
+                <div style="font-weight:bold;">${idx + 1}. ${it.nombre}</div>
+                <div style="font-size: 8.5pt; color: #333;">${it.nivel} - ${it.grado} "${it.seccion}"</div>
+                <div style="padding-left: 5px;">
+                    > ${it.nomCon}<br>
+                    <span style="font-weight: bold;">PAGADO: S/ ${montoInd.toFixed(2)}</span>
+                    <div style="font-size: 8.5pt; color: #444;">(Ef: ${parseFloat(it.efectivo).toFixed(2)} | Dg: ${parseFloat(it.digital).toFixed(2)})</div>
+                    <div style="border-left: 2.2px solid #000; padding-left: 6px; margin-top:3px; font-size: 9.5pt;">
+                        ${it.tipo !== 'EXCEPCIONAL' ? `<div>SALDO PEND: S/ ${saldoRestante.toFixed(2)}</div>` : ''}
+                        ${it.avancePensiones ? `<div>PAGOS REGULARES: ${it.avancePensiones}</div>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        let infoDigitalHTML = (totalDigital > 0 && (medioDigital || codOp)) ? `
+            <div style="margin: 8px 0; font-size: 9.5pt; border-top: 1px dotted #ccc; padding-top: 5px;">
+                ${medioDigital ? `<strong>MEDIO:</strong> ${medioDigital.toUpperCase()}<br>` : ''}
+                ${codOp ? `<strong>CÓD. OP:</strong> ${codOp}` : ''}
+            </div>` : "";
+
+        htmlContent += `
+            <div style="border-bottom: 2px double #000; margin: 8px 0;"></div>
+            <div style="text-align: right; font-weight: bold; font-size: 10pt;">
+                ${totalEfectivo > 0 ? `<div>EFECTIVO: S/ ${totalEfectivo.toFixed(2)}</div>` : ''}
+                ${totalDigital > 0 ? `<div>DIGITAL: S/ ${totalDigital.toFixed(2)}</div>` : ''}
+            </div>
+            ${infoDigitalHTML}
+            <div style="text-align: center; font-size: 15px; font-weight: bold; border: 1.5px solid #000; padding: 7px; margin-top: 6px;">
+                TOTAL: S/ ${granTotal.toFixed(2)}
+            </div>
+            ${obs ? `<div style="margin-top: 10px; font-size: 9.5pt;"><strong>OBS:</strong> ${obs}</div>` : ''}
+        `;
+
+        const alumnosConDeuda = Object.keys(deudasPorAlumno);
+        if (alumnosConDeuda.length > 0) {
+            htmlContent += `<div style="margin-top: 12px; padding-top: 6px; border-top: 1px dashed #000;">
+                <div style="font-weight: bold; font-size: 9.5pt; margin-bottom: 5px;">PAGOS PENDIENTES (ADICIONALES):</div>`;
+            alumnosConDeuda.forEach(nombre => {
+                htmlContent += `<div style="font-size: 8.5pt; font-weight: bold; color: #444; margin-top: 5px; text-transform: uppercase;">${nombre}:</div>`;
+                deudasPorAlumno[nombre].forEach(d => {
+                    htmlContent += `
+                        <div style="font-size: 9.5pt; display: flex; justify-content: space-between; padding-left: 6px; margin-bottom: 3px;">
+                            <span>• ${d.concepto}</span>
+                            <span style="font-weight: bold;">S/ ${parseFloat(d.saldo).toFixed(2)}</span>
+                        </div>`;
+                });
+            });
+            htmlContent += `</div>`;
         }
 
-        const saldoRestante = (it.saldoPrevio || 0) - parseFloat(it.totalInd);
-        const bloqueSaldo = (it.tipo !== 'EXCEPCIONAL') ? `
-            <div style="font-size: 9px; margin-top: 2px;">SALDO PEND: S/ ${saldoRestante.toFixed(2)}</div>` : '';
-
+        // --- FOOTER FINAL (CON ESPACIADO EXTRA) ---
         htmlContent += `
-        <div style="margin-bottom: 10px;">
-            <div style="font-weight:bold;">${idx + 1}. ${it.nombre}</div>
-            <div style="padding-left: 5px; font-size: 10px;">
-                > ${it.nomCon}<br>
-                <span>Pagado: S/ ${parseFloat(it.totalInd).toFixed(2)}</span>
-                <div style="border-left: 2px solid #000; padding-left: 5px; margin-top:2px; font-size: 9px;">
-                   ${bloqueSaldo}
-                   ${textoEstado}
-                </div>
+            <div style="border-bottom: 1px dashed #000; margin: 20px 0 10px 0;"></div>
+            <div style="text-align: center; font-size: 10pt; line-height: 1.4; padding-bottom: 10px;">
+                ***Gracias por su responsabilidad.***<br>
+                <span style="font-size: 9pt; font-style: italic;">Comprobante de control interno escolar.</span>
             </div>
-        </div>`;
-    });
+        `;
 
-    htmlContent += `
-        <div style="border-bottom: 3px double #000; margin: 5px 0;"></div>
-        <div style="text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px;">
-            TOTAL: S/ ${granTotal.toFixed(2)}
-        </div>
-    `;
+        element.innerHTML = htmlContent;
 
-    if (medioDigital && medioDigital.trim() !== "") {
-        htmlContent += `
-        <div style="margin-top: 10px; font-size: 9px; background: #eee; padding: 5px;">
-            <strong>M. DIGITAL:</strong> ${medioDigital}<br>
-            <strong>CÓD. OP:</strong> ${codOp}
-        </div>`;
-    }
+        // --- 2. CÁLCULO DE ALTO DINÁMICO REAL ---
+        document.body.appendChild(element);
+        // scrollHeight captura el tamaño total real del contenido incluyendo lo que no se ve
+        const heightPx = element.scrollHeight; 
+        // Conversión a mm + un colchón de seguridad de 25mm para evitar cualquier recorte
+        const heightMm = Math.ceil(heightPx * 0.264583) + 25; 
+        document.body.removeChild(element);
 
-    if (obs) {
-        htmlContent += `<div style="margin-top: 8px; font-size: 9px;"><strong>OBS:</strong> ${obs}</div>`;
-    }
+        // --- 3. CONFIGURACIÓN DEL PDF ---
+        const opt = {
+            margin: 0,
+            filename: `Recibo-${nroRecibo}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 3, 
+                useCORS: true, 
+                letterRendering: true,
+                scrollY: 0
+            },
+            jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
+            // Evitamos que intente crear páginas nuevas
+            pagebreak: { mode: 'avoid-all' } 
+        };
 
-    htmlContent += `
-        <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
-        <div style="text-align: center; font-size: 10px; margin-top: 10px;">
-            ¡Gracias por su confianza!<br>
-            <span style="font-size: 8px;">Copia digital generada por sistema.</span>
-        </div>
-    `;
+        html2pdf().set(opt).from(element).save().then(() => {
+            cerrarNotify();
+            lanzarNotificacion('success', 'PDF', 'Ticket generado correctamente.');
+        }).catch(err => { throw err; });
 
-    element.innerHTML = htmlContent;
-
-    // 3. Configuración y Generación
-    const opt = {
-        margin:       [10, 5],
-        filename:     `Recibo-${nroRecibo}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 3, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: [80, 250], orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(element).save().then(() => {
+    } catch (error) {
+        console.error("Error PDF:", error);
         cerrarNotify();
-        lanzarNotificacion('success', 'PDF GENERADO', 'Se descargó el archivo correctamente.');
-    }).catch(err => {
-        console.error(err);
-        cerrarNotify();
-        lanzarNotificacion('error', 'ERROR', 'Fallo al generar PDF.');
-    });
+        lanzarNotificacion('error', 'SISTEMA', 'Error al generar PDF.');
+    }
 }
 
-/* --- FUNCIÓN PUENTE PARA DESCARGAR DESDE HISTORIAL --- */
+
 function descargarPDFDesdeHistorial(index) {
     const item = historialCache[index];
     if (!item) return;
 
-    // La función descargarTicketPDF espera un array de ítems (borrador)
-    // Convertimos el pago individual en un array de un solo elemento
+    // 1. Obtener deudas ADICIONALES actuales para este estudiante
+    const listaPendientes = (typeof pendientesCache !== 'undefined' && Array.isArray(pendientesCache)) ? pendientesCache : [];
+    const deudasAdicionales = listaPendientes
+        .filter(d => d.tipoCon === 'ADICIONAL')
+        .map(d => ({ nombre: d.nomCon, saldo: d.saldo }));
+
+    // 2. Cálculo de Saldo Histórico del concepto del recibo
+    const deudaHoy = listaPendientes.find(d => d.nomCon === item.nomCon);
+    const saldoPendienteHoy = deudaHoy ? parseFloat(deudaHoy.saldo) : 0;
+    const nroReciboActual = parseInt(item.nroRecibo);
+
+    const pagosPosteriores = historialCache.reduce((sum, p) => {
+        const nroP = parseInt(p.nroRecibo);
+        if (p.nomCon === item.nomCon && nroP > nroReciboActual) {
+            return sum + parseFloat(p.total || 0);
+        }
+        return sum;
+    }, 0);
+
+    const montoDeEsteRecibo = parseFloat(item.total || 0);
+    const saldoAntesDeEstePago = saldoPendienteHoy + pagosPosteriores + montoDeEsteRecibo;
+
+    // 3. Preparar datos para el PDF
     const datosParaPDF = [{
-        nombre: document.getElementById('hist-student-name').innerText, // Nombre del estudiante actual
+        nombre: document.getElementById('hist-student-name')?.innerText || 'ESTUDIANTE', 
         nomCon: item.nomCon,
-        totalInd: item.total,
-        efectivo: item.efectivo,
-        digital: item.digital,
-        medio: item.medio,
-        codOp: item.codOp,
-        obs: item.obs,
-        fecha: item.fecha, // Usará esta fecha para el PDF
-        saldoPrevio: item.saldoPrevio || 0,
-        tipo: item.tipo || 'REGULAR'
+        totalInd: montoDeEsteRecibo,
+        efectivo: parseFloat(item.efectivo || 0),
+        digital: parseFloat(item.digital || 0),
+        
+        nivel: document.getElementById('hist-txt-nivel')?.innerText || '',
+        grado: document.getElementById('hist-txt-grado')?.innerText || '',
+        seccion: document.getElementById('hist-txt-seccion')?.innerText || '',
+
+        medio: item.medio || '',
+        codOp: item.codOp || '',
+        obs: item.obs || '',
+        fecha: item.fecha, 
+        saldoPrevio: saldoAntesDeEstePago,
+        tipo: item.tipo || 'REGULAR',
+        avancePensiones: item.avancePensiones || '',
+        // Enviamos las deudas adicionales para que aparezcan en el footer
+        deudasAdicionales: deudasAdicionales 
     }];
 
-    // Llamamos a tu función existente
+    // La función descargarTicketPDF ya tiene la lógica de altura scrollHeight + colchón
     descargarTicketPDF(datosParaPDF, item.nroRecibo);
 }
