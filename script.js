@@ -6,7 +6,42 @@ let listaResponsables = []; // Memoria local para filtrar rápido
 let seccionesGlobal = [];
 let anioActivoID = "";
 let anioActivoNombre = ""; // Nueva: Para mostrar el texto en la interfaz (Labels)
+let dataConsultasGlobal = null; // Almacenará los años, niveles y secciones
+let dataReportePagosGlobal = null; // Almacenará Conceptos, Pagos, Descuentos y Matrículas
+let dataCajaHoyGlobal = null;// Variable global para almacenar la caja de hoy
 
+//Descarga los datos de la caja de hoy en segundo plano.
+async function preCargarCajaHoy() {
+    // Si ya existe data, no volvemos a pedir para ahorrar recursos
+    if (dataCajaHoyGlobal) return;
+
+    try {
+        const hoy = new Date().toISOString().split('T')[0];
+        const res = await sendRequest('get_caja_diaria', { fecha: hoy });
+        
+        if (res.status === 'success') {
+            dataCajaHoyGlobal = res;
+            console.log("💰 Caja Diaria precargada con éxito.");
+        }
+    } catch (error) {
+        console.error("Error en precarga de caja:", error);
+    }
+}
+
+async function preCargarDataConsultas() {
+    // Si ya tiene datos, no volvemos a pedir (ahorro de ancho de banda)
+    if (dataConsultasGlobal) return;
+
+    try {
+        const res = await sendRequest('get_consultas_secciones');
+        if (res.status === 'success') {
+            dataConsultasGlobal = res;
+            console.log("🚀 Datos de Consultas precargados con éxito.");
+        }
+    } catch (e) {
+        console.error("Error en precarga de consultas:", e);
+    }
+}
 
 // 2. INICIALIZACIÓN (Al cargar la página)
 document.addEventListener('DOMContentLoaded', () => {
@@ -106,7 +141,11 @@ async function iniciarSesion() {
                 filtrarMenuPorRol(currentUser.role);
             }
 
-            loadView('dashboard'); 
+            loadView('dashboard');
+            cargarEstudiantes();
+            preCargarDataConsultas();
+            preCargarDataReportes();
+            preCargarCajaHoy(); 
 
         } else {
             // --- BLOQUE DE ERROR / SOLICITUD ---
@@ -608,153 +647,180 @@ async function guardarResponsable(event) {
 
 ////////////////////
 // --- MÓDULO DE ESTUDIANTES ---
-// --- 1. FUNCIÓN PARA CARGAR LOS DATOS DESDE EL SERVIDOR ---
+
+// --- 1. CARGA INICIAL (SOLO NOMBRES E IDs) ---
 async function cargarEstudiantes() {
-    const tbody = document.getElementById('tbody-estudiantes');
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:30px;">Buscando datos...</td></tr>';
-
+    // Ya no mostramos el mensaje de "Buscando datos" en la tabla, porque la tabla está oculta.
     try {
-        // 1. Nos aseguramos de tener la lista de responsables primero
-        if (!window.listaResponsables || window.listaResponsables.length === 0) {
-            const respData = await sendRequest('get_responsables');
-            window.listaResponsables = respData.data || [];
-        }
-
-        // 2. Cargamos los estudiantes
+        // Traemos la lista completa pero solo usaremos los nombres para el buscador
         const response = await sendRequest('get_estudiantes');
         
         if (response && response.status === 'success') {
             window.listaEstudiantes = response.data;
-            dibujarTablaEstudiantes(response.data);
-        } else {
-            tbody.innerHTML = `<tr><td colspan="4">Error: ${response.message}</td></tr>`;
+            // No dibujamos nada aún.
         }
     } catch (error) {
-        console.error("Error en carga:", error);
+        console.error("Error en carga inicial:", error);
     }
 }
+
+// --- 2. FILTRADO Y SUGERENCIAS (Buscador Superior) ---
+function filtrarEstudiantes() {
+    const input = document.getElementById('search-est');
+    const resultadosBox = document.getElementById('est-search-results');
+    const texto = input.value.toLowerCase().trim();
+
+    if (texto.length < 2) {
+        resultadosBox.style.display = 'none';
+        return;
+    }
+
+    const filtrados = window.listaEstudiantes.filter(est => 
+        est.dni.toString().includes(texto) || 
+        `${est.paterno} ${est.materno} ${est.nombres}`.toLowerCase().includes(texto)
+    ).slice(0, 8);
+
+    if (filtrados.length > 0) {
+        resultadosBox.innerHTML = filtrados.map(est => `
+            <div class="search-item" onclick="seleccionarEstudianteParaFicha('${est.id}')">
+                <div style="font-weight:bold; color: #1e293b;">${est.paterno} ${est.materno}, ${est.nombres}</div>
+                <div style="font-size: 0.8rem; color: #64748b;">DNI: ${est.dni} • ID: ${est.id}</div>
+            </div>
+        `).join('');
+        resultadosBox.style.display = 'block';
+    } else {
+        resultadosBox.innerHTML = '<div style="padding:15px; color:#94a3b8; font-size: 0.9rem;">No se encontraron coincidencias.</div>';
+        resultadosBox.style.display = 'block';
+    }
+}
+
+// --- 3. SELECCIÓN Y MUESTRA DE TABLA ---
+async function seleccionarEstudianteParaTabla(id) {
+    const input = document.getElementById('search-est');
+    const resultadosBox = document.getElementById('est-search-results');
+    const tablaContainer = document.getElementById('est-table-container');
+
+    // 1. Limpiar buscador
+    resultadosBox.style.display = 'none';
+    input.value = ""; 
+
+    // 2. Asegurarnos de tener responsables para dibujar la fila
+    if (!window.listaResponsables || window.listaResponsables.length === 0) {
+        const respData = await sendRequest('get_responsables');
+        window.listaResponsables = respData.data || [];
+    }
+
+    // 3. Filtrar el estudiante seleccionado
+    const seleccionado = window.listaEstudiantes.filter(e => e.id === id);
+
+    // 4. Mostrar el contenedor de la tabla y dibujar
+    tablaContainer.style.display = 'block';
+    dibujarTablaEstudiantes(seleccionado);
+}
+
+
 
 // --- 2. FUNCIÓN PARA DIBUJAR LA TABLA EN EL HTML ---
 function dibujarTablaEstudiantes(datos) {
     const tbody = document.getElementById('tbody-estudiantes');
     if (!tbody) return;
-    tbody.innerHTML = '';
 
-    datos.forEach(est => {
-        const responsable = window.listaResponsables.find(r => r.id === est.idResp1);
-        const nombreResp = responsable ? `${responsable.paterno} ${responsable.nombres}` : est.idResp1;
+    // Construimos todo el HTML en una sola variable
+    const html = datos.map(est => {
+        const resp = window.listaResponsables.find(r => String(r.id) === String(est.idResp1));
+        const nombreResp = resp ? `${resp.paterno} ${resp.materno || ''}, ${resp.nombres}`.trim() : (est.idResp1 || '---');
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="padding: 15px;">${est.dni}</td>
-            <td style="padding: 15px;"><strong>${est.paterno} ${est.materno}</strong>, ${est.nombres}</td>
-            <td style="padding: 15px; color: var(--text-muted);">${nombreResp}</td>
-            <td style="padding: 15px;">
-                <div class="action-buttons">
-                    <button class="btn-icon view" onclick="verEstudiante('${est.id}')" title="Ver Detalle">
-                        <i class="material-icons">visibility</i>
-                    </button>
-                    <button class="btn-icon edit" onclick="editarEstudiante('${est.id}')" title="Editar">
-                        <i class="material-icons">edit</i>
-                    </button>
-                </div>
-            </td>
+        return `
+            <tr>
+                <td style="padding: 15px; font-weight: bold; color: #2563eb;">${est.id}</td>
+                <td style="padding: 15px;">${est.dni}</td>
+                <td style="padding: 15px;"><strong>${est.paterno} ${est.materno}</strong>, ${est.nombres}</td>
+                <td style="padding: 15px; color: var(--text-muted);">
+                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">person</i> ${nombreResp}
+                </td>
+                <td style="padding: 15px;">
+                    <div class="action-buttons">
+                        <button class="btn-icon view" onclick="verEstudiante('${est.id}')"><i class="material-icons">visibility</i></button>
+                        <button class="btn-icon edit" onclick="editarEstudiante('${est.id}')"><i class="material-icons">edit</i></button>
+                    </div>
+                </td>
+            </tr>
         `;
-        tbody.appendChild(tr);
-    });
+    }).join('');
+
+    // Una sola actualización del DOM (mucho más rápido)
+    tbody.innerHTML = html;
 }
 
 // --- 3. FUNCIÓN PARA RENDERIZAR LA VISTA (LLAMADA DESDE LOADVIEW) ---
+
 function renderEstudiantesView() {
     const content = document.getElementById('content-area');
+    
+    // Integramos el Buscador + Contenedor de Ficha + Modal de Edición
     content.innerHTML = `
         <div class="module-header" style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
             
-            <div class="search-group">
-                <input type="text" id="search-est" placeholder="🔍 Buscar Estudiante..." onkeyup="filtrarEstudiantes()">
-                <button type="button" class="btn-clear" onclick="limpiarBusquedaEstudiantes()">
-                    <i class="material-icons" style="font-size: 1.2rem;">backspace</i> Limpiar
-                </button>
+            <div style="position: relative; flex: 1; min-width: 300px;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                    <i class="material-icons" style="position: absolute; left: 18px; color: #94a3b8; pointer-events: none; z-index: 10; font-size: 22px;">search</i>
+                    <input type="text" id="search-est" placeholder="Escriba Apellidos o DNI para buscar..." 
+                           onkeyup="filtrarEstudiantes()" autocomplete="off" 
+                           style="padding: 12px 20px 12px 55px !important; height: 50px; border-radius: 12px; border: 2px solid #e2e8f0; width: 100%; font-size: 1rem; box-sizing: border-box; transition: all 0.3s; box-shadow: var(--shadow-sm);">
+                </div>
+                <div id="est-search-results" class="search-results-box" style="position: absolute; width: 100%; z-index: 100; top: 110%;"></div>
             </div>
 
-            <button class="btn-primary" onclick="abrirModalEstudiante()" style="width: auto; height: 50px; padding: 0 25px; display: flex; align-items: center; gap: 8px;">
-                <i class="material-icons">person_add</i> Nuevo Estudiante
+            <button class="btn-primary" onclick="abrirModalEstudiante()" style="width: auto; height: 50px; padding: 0 25px; display: flex; align-items: center; gap: 8px; border-radius: 12px; font-weight: bold;">
+                <i class="material-icons">person_add</i> NUEVO ESTUDIANTE
             </button>
         </div>
 
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>DNI</th>
-                        <th>APELLIDOS Y NOMBRES</th>
-                        <th>RESPONSABLE PRINCIPAL</th>
-                        <th>ACCIONES</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-estudiantes">
-                    <tr><td colspan="4" style="text-align:center; padding:30px;">Cargando estudiantes...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div id="est-ficha-container" style="display:none; animation: fadeIn 0.4s ease; margin-bottom: 30px;"></div>
 
         <div id="modal-estudiante" class="modal-overlay">
-            <div class="modal-content">
-                <h3 id="modal-title-est">Ficha del Estudiante</h3>
+            <div class="modal-content" style="max-width: 850px; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 20px;">
+                    <h3 id="modal-title-est" style="margin:0; color: #1e293b; font-weight: 800;">Ficha del Estudiante</h3>
+                    <button type="button" onclick="cerrarModalEstudiante()" style="background:none; border:none; cursor:pointer; color:#94a3b8;"><i class="material-icons">close</i></button>
+                </div>
                 
                 <form id="form-estudiante" onsubmit="procesarGuardadoEstudiante(event)">
                     <input type="hidden" id="est-id">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
-                        <div>
-                            <label>Apellido Paterno</label>
-                            <input type="text" id="est-paterno" placeholder="Ej. Pérez" required>
-                        </div>
-                        <div>
-                            <label>Apellido Materno</label>
-                            <input type="text" id="est-materno" placeholder="Ej. García" required>
-                        </div>
-                        <div>
-                            <label>Nombres Completos</label>
-                            <input type="text" id="est-nombres" placeholder="Ej. Juan Carlos" required>
-                        </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div><label class="form-label">Apellido Paterno</label><input type="text" id="est-paterno" class="form-input" required></div>
+                        <div><label class="form-label">Apellido Materno</label><input type="text" id="est-materno" class="form-input" required></div>
+                        <div><label class="form-label">Nombres</label><input type="text" id="est-nombres" class="form-input" required></div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-top: 15px;">
+                        <div><label class="form-label">DNI</label><input type="text" id="est-dni" class="form-input" maxlength="8" required></div>
                         <div>
-                            <label>Documento DNI</label>
-                            <input type="text" id="est-dni" placeholder="8 dígitos" required>
-                        </div>
-                        <div>
-                            <label>Género / Sexo</label>
-                            <select id="est-sexo" required class="custom-select">
-                                <option value="">Seleccione...</option>
+                            <label class="form-label">Género</label>
+                            <select id="est-sexo" class="form-input" required>
                                 <option value="Masculino">Masculino</option>
                                 <option value="Femenino">Femenino</option>
                             </select>
                         </div>
-                        <div>
-                            <label>Fecha de Nacimiento</label>
-                            <input type="date" id="est-nacimiento" required>
-                        </div>
+                        <div><label class="form-label">Fecha Nacimiento</label><input type="date" id="est-nacimiento" class="form-input" required></div>
                     </div>
 
-                    <div style="margin-top: 20px;">
-                        <label>Dirección Domiciliaria</label>
-                        <input type="text" id="est-direccion" placeholder="Calle, Av. o Jr. con número" required style="width:100%;">
+                    <div style="margin-top: 15px;">
+                        <label class="form-label">Dirección Domiciliaria</label>
+                        <input type="text" id="est-direccion" class="form-input" placeholder="Ej: Calle Aurelio de la Fuente 102">
                     </div>
 
-                    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 15px; margin-top: 25px; padding-top: 15px; border-top: 1px dashed #e2e8f0;">
                         <div style="position: relative;">
-                            <label>Responsable Principal *</label>
-                            <input type="text" id="search-resp1" placeholder="Buscar por DNI o Nombre..." onkeyup="buscarResponsableEnModal(1)" autocomplete="off">
-                            <input type="hidden" id="est-id-resp1"> 
-                            <div id="results-resp1" class="search-results-box"></div> 
+                            <label class="form-label" style="color: #2563eb; font-weight: bold;">Responsable Principal (Buscador)</label>
+                            <input type="text" id="search-resp1" class="form-input" placeholder="Buscar por DNI o Apellidos..." onkeyup="buscarResponsableEnModal(1)" autocomplete="off">
+                            <input type="hidden" id="est-id-resp1">
+                            <div id="results-resp1" class="search-results-box"></div>
                         </div>
-
                         <div>
-                            <label>Parentesco</label>
-                            <select id="est-parent1" class="custom-select">
+                            <label class="form-label">Parentesco</label>
+                            <select id="est-parent1" class="form-input">
                                 <option value="PADRE">PADRE</option>
                                 <option value="MADRE">MADRE</option>
                                 <option value="APODERADO">APODERADO/A</option>
@@ -762,18 +828,17 @@ function renderEstudiantesView() {
                         </div>
                     </div>
 
-                    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 15px; margin-top: 15px;">
                         <div style="position: relative;">
-                            <label>Responsable 2 (Opcional)</label>
-                            <input type="text" id="search-resp2" placeholder="Buscar por DNI o Nombre..." onkeyup="buscarResponsableEnModal(2)" autocomplete="off">
-                            <input type="hidden" id="est-id-resp2"> 
-                            <div id="results-resp2" class="search-results-box"></div> 
+                            <label class="form-label" style="color: #64748b;">Responsable Secundario (Opcional)</label>
+                            <input type="text" id="search-resp2" class="form-input" placeholder="Buscar por DNI o Apellidos..." onkeyup="buscarResponsableEnModal(2)" autocomplete="off">
+                            <input type="hidden" id="est-id-resp2">
+                            <div id="results-resp2" class="search-results-box"></div>
                         </div>
-
                         <div>
-                            <label>Parentesco 2</label>
-                            <select id="est-parent2" class="custom-select">
-                                <option value="">Ninguno</option>
+                            <label class="form-label">Parentesco 2</label>
+                            <select id="est-parent2" class="form-input">
+                                <option value="">NINGUNO</option>
                                 <option value="PADRE">PADRE</option>
                                 <option value="MADRE">MADRE</option>
                                 <option value="APODERADO">APODERADO/A</option>
@@ -781,27 +846,121 @@ function renderEstudiantesView() {
                         </div>
                     </div>
 
-                    <div style="margin-top: 40px; text-align: right; display: flex; gap: 15px; justify-content: flex-end;">
-                        <button type="button" onclick="cerrarModalEstudiante()" class="btn-cancel">CANCELAR</button>
-                        <button type="submit" id="btn-save-est" class="btn-primary" style="width: auto;">GUARDAR ESTUDIANTE</button>
+                    <div style="margin-top: 30px; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" onclick="cerrarModalEstudiante()" class="btn-secondary" style="background:#f1f5f9; color:#64748b; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">CANCELAR</button>
+                        <button type="submit" id="btn-save-est" class="btn-primary" style="padding:10px 30px; border-radius:8px; font-weight:bold; width: auto;">GUARDAR CAMBIOS</button>
                     </div>
                 </form>
             </div>
         </div>
+    `;
+    
+    // Al terminar de renderizar, iniciamos la carga de la lista de estudiantes
+    cargarEstudiantes();
+}
 
-        <div id="modal-success" class="modal-overlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; z-index: 3000; justify-content: center; align-items: center;">
-            <div class="modal-content" style="max-width: 400px; text-align: center; padding: 40px;">
-                <i class="material-icons" style="font-size: 70px; color: #10b981; margin-bottom: 20px;">check_circle</i>
-                <h3 style="margin-bottom: 10px;">¡Guardado Exitoso!</h3>
-                <p style="color: var(--text-muted); margin-bottom: 25px;">Los datos han sido procesados correctamente.</p>
-                <button class="btn-primary" onclick="cerrarExito()">ACEPTAR</button>
+async function seleccionarEstudianteParaFicha(id) {
+    const input = document.getElementById('search-est');
+    const resultadosBox = document.getElementById('est-search-results');
+    const fichaContainer = document.getElementById('est-ficha-container');
+
+    // 1. Limpieza inmediata
+    resultadosBox.style.display = 'none';
+    input.value = ""; 
+
+    // 2. Mostrar Spinner de Carga
+    fichaContainer.style.display = 'block';
+    fichaContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; background: white; border-radius: 16px; border: 1px solid #e2e8f0;">
+            <div class="spinner" style="width: 40px; height: 40px; border-width: 4px; border-top-color: #2563eb;"></div>
+            <p style="margin-top: 20px; color: #64748b; font-weight: 600; font-size: 0.9rem; letter-spacing: 0.5px;">ENLAZANDO DATOS FAMILIARES...</p>
+        </div>
+    `;
+
+    // 3. Carga de responsables (Aquí es donde ocurre la demora la primera vez)
+    if (!window.listaResponsables || window.listaResponsables.length === 0) {
+        try {
+            const respData = await sendRequest('get_responsables');
+            window.listaResponsables = respData.data || [];
+        } catch (e) {
+            console.error("Error cargando responsables:", e);
+        }
+    }
+
+    const est = window.listaEstudiantes.find(e => e.id === id);
+    if (!est) return;
+
+    // --- LÓGICA DE EDAD ---
+    let edadTexto = "---";
+    if (est.nacimiento) {
+        const hoy = new Date();
+        const cumple = new Date(est.nacimiento);
+        let edad = hoy.getFullYear() - cumple.getFullYear();
+        if (hoy.getMonth() < cumple.getMonth() || (hoy.getMonth() === cumple.getMonth() && hoy.getDate() < cumple.getDate())) {
+            edad--;
+        }
+        edadTexto = `${edad} años`;
+    }
+
+    const r1 = window.listaResponsables.find(r => String(r.id) === String(est.idResp1));
+    const r2 = est.idResp2 ? window.listaResponsables.find(r => String(r.id) === String(est.idResp2)) : null;
+    
+    const nombreR1 = r1 ? `${r1.paterno} ${r1.materno || ''}, ${r1.nombres}` : "No asignado";
+    const telfR1 = r1 ? (r1.telefono1 || r1.telefono2 || 'Sin teléfono') : '---';
+    const nombreR2 = r2 ? `${r2.paterno} ${r2.materno || ''}, ${r2.nombres}` : "No asignado";
+    const telfR2 = r2 ? (r2.telefono1 || r2.telefono2 || 'Sin teléfono') : '---';
+
+    // 4. Renderizar la Ficha Final (Con animación fadeIn)
+    fichaContainer.innerHTML = `
+        <div style="background: white; border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; border: 1px solid #e2e8f0; animation: fadeIn 0.4s ease;">
+            <div style="background: #2563eb; padding: 20px 30px; color: white; display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1; min-width: 0;">
+                    <i class="material-icons" style="font-size: 32px; opacity: 0.9;">account_circle</i>
+                    <div style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                        <h2 style="margin: 0; font-size: 1.5rem; letter-spacing: 0.3px; display: inline;">${est.paterno} ${est.materno}, ${est.nombres}</h2>
+                        <span style="margin-left: 15px; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">ID: ${est.id}</span>
+                    </div>
+                </div>
+                <button onclick="editarEstudiante('${est.id}')" class="btn-primary" 
+                        style="background: white; color: #2563eb; border: none; font-weight: 800; height: 40px; padding: 0 20px; font-size: 0.85rem; width: auto; min-width: 140px;">
+                    <i class="material-icons" style="font-size: 18px;">edit</i> EDITAR
+                </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 35px;">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #1e293b; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; font-size: 1.1rem;">
+                        <i class="material-icons" style="color: #2563eb;">person</i> Información Personal
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                        <div><label style="color: #64748b; font-size: 0.7rem; font-weight: 800;">DNI</label><p style="margin: 3px 0; font-weight: 600;">${est.dni}</p></div>
+                        <div><label style="color: #64748b; font-size: 0.7rem; font-weight: 800;">GÉNERO</label><p style="margin: 3px 0; font-weight: 600;">${est.sexo}</p></div>
+                        <div><label style="color: #64748b; font-size: 0.7rem; font-weight: 800;">EDAD ACTUAL</label><p style="margin: 3px 0; font-weight: 700; color: #2563eb; font-size: 1.1rem;">${edadTexto}</p></div>
+                        <div><label style="color: #64748b; font-size: 0.7rem; font-weight: 800;">FECHA NAC.</label><p style="margin: 3px 0; font-weight: 600;">${new Date(est.nacimiento).toLocaleDateString()}</p></div>
+                        <div style="grid-column: span 2;"><label style="color: #64748b; font-size: 0.7rem; font-weight: 800;">DIRECCIÓN</label><p style="margin: 3px 0; font-weight: 600;">${est.direccion || '---'}</p></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #1e293b; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; font-size: 1.1rem;">
+                        <i class="material-icons" style="color: #10b981;">contact_phone</i> Contacto y Familia
+                    </h3>
+                    <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px;">
+                        <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border-left: 4px solid #2563eb; display: flex; justify-content: space-between;">
+                            <div><label style="color: #2563eb; font-size: 0.65rem; font-weight: 900;">${est.parentesco1 || 'RESP.'}</label><p style="margin: 2px 0; font-weight: 700;">${nombreR1}</p></div>
+                            <div style="text-align: right;"><label style="color: #64748b; font-size: 0.65rem; font-weight: 800;">CELULAR</label><p style="margin: 2px 0; font-weight: 700; color: #2563eb;">${telfR1}</p></div>
+                        </div>
+                        <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border-left: 4px solid #64748b; display: flex; justify-content: space-between;">
+                            <div><label style="color: #64748b; font-size: 0.65rem; font-weight: 900;">${est.parentesco2 || 'RESP.'}</label><p style="margin: 2px 0; font-weight: 700;">${nombreR2}</p></div>
+                            <div style="text-align: right;"><label style="color: #64748b; font-size: 0.65rem; font-weight: 800;">CELULAR</label><p style="margin: 2px 0; font-weight: 700;">${telfR2}</p></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
-    
-    // Una vez inyectado el HTML, llamamos a la función de carga
-    cargarEstudiantes();
 }
+
 
 // Función para obtener el ID real desde el datalist
 function vincularID(num) {
@@ -895,16 +1054,17 @@ async function buscarResponsableEnModal(num) {
     const resultsDiv = document.getElementById(`results-resp${num}`);
     const hiddenId = document.getElementById(`est-id-resp${num}`);
     
-    if (!input || !resultsDiv) return;
+    if (!input || !resultsDiv || !hiddenId) return;
 
     const query = input.value.toLowerCase().trim();
 
     if (query.length < 2) { 
         resultsDiv.style.display = 'none'; 
+        hiddenId.value = ""; 
+        input.style.borderColor = '#e5e7eb';
         return; 
     }
 
-    // CARGA DE SEGURIDAD: Si la lista está vacía, la traemos
     if (!window.listaResponsables || window.listaResponsables.length === 0) {
         const resp = await sendRequest('get_responsables');
         if (resp && resp.data) {
@@ -912,11 +1072,10 @@ async function buscarResponsableEnModal(num) {
         }
     }
 
-    // FILTRADO
     const filtrados = window.listaResponsables.filter(r => {
         const dni = r.dni ? r.dni.toString() : "";
-        const nombre = `${r.paterno} ${r.materno} ${r.nombres}`.toLowerCase();
-        return dni.includes(query) || nombre.includes(query);
+        const nombreCompleto = `${r.paterno} ${r.materno || ''} ${r.nombres}`.toLowerCase();
+        return dni.includes(query) || nombreCompleto.includes(query);
     });
 
     resultsDiv.innerHTML = '';
@@ -926,12 +1085,16 @@ async function buscarResponsableEnModal(num) {
         filtrados.slice(0, 5).forEach(r => {
             const div = document.createElement('div');
             div.className = 'search-item';
-            div.innerHTML = `<strong>${r.dni}</strong> - ${r.paterno} ${r.nombres}`;
+            
+            // FORMATO: PATERNO MATERNO, NOMBRES
+            const nombreFormateado = `${r.paterno} ${r.materno || ''}, ${r.nombres}`.trim();
+            
+            div.innerHTML = `<strong>${r.dni}</strong> - ${nombreFormateado}`;
             div.onclick = () => {
-                input.value = `${r.paterno} ${r.nombres}`;
-                hiddenId.value = r.id; // Guardamos el ID real
+                input.value = nombreFormateado;
+                hiddenId.value = r.id; 
                 resultsDiv.style.display = 'none';
-                input.style.borderColor = '#10b981'; // Color verde de éxito
+                input.style.borderColor = '#10b981';
             };
             resultsDiv.appendChild(div);
         });
@@ -944,90 +1107,34 @@ async function buscarResponsableEnModal(num) {
 
 function cerrarExito() { document.getElementById('modal-success').style.display = 'none'; }
 function cerrarModalEstudiante() { document.getElementById('modal-estudiante').style.display = 'none'; }
+//Abrir NUEVO ESTUDIANTE
 function abrirModalEstudiante() { 
-    configurarModoFormulario('form-estudiante', 'btn-save-est', false); // HABILITAR
+    configurarModoFormulario('form-estudiante', 'btn-save-est', false); 
     document.getElementById('form-estudiante').reset();
     document.getElementById('modal-title-est').innerText = "Nuevo Estudiante";
+    
+    // Limpiar IDs ocultos
     document.getElementById('est-id').value = "";
     document.getElementById('est-id-resp1').value = "";
     document.getElementById('est-id-resp2').value = "";
-    // --- LÍNEAS PARA RESETEAR EL BOTÓN ---
+    
+    // --- LIMPIEZA VISUAL DE BUSCADORES ---
+    const search1 = document.getElementById('search-resp1');
+    const search2 = document.getElementById('search-resp2');
+    
+    if (search1) { search1.value = ""; search1.style.borderColor = '#e5e7eb'; }
+    if (search2) { search2.value = ""; search2.style.borderColor = '#e5e7eb'; }
+    // -------------------------------------
+
     const btn = document.getElementById('btn-save-est');
     if (btn) {
         btn.disabled = false;
-        btn.innerHTML = "GUARDAR ESTUDIANTE"; // Regresa al texto original
+        btn.innerHTML = "GUARDAR ESTUDIANTE";
     }
-    // -------------------------------------
+    
     document.getElementById('modal-estudiante').style.display = 'flex'; 
 }
 
-
-// --- FUNCIÓN PARA FILTRAR (Buscador superior) ---
-function filtrarEstudiantes() {
-    const texto = document.getElementById('search-est').value.toLowerCase();
-    const filtrados = window.listaEstudiantes.filter(est => 
-        est.dni.toString().includes(texto) || 
-        (est.paterno + " " + est.materno + " " + est.nombres).toLowerCase().includes(texto)
-    );
-    dibujarTablaEstudiantes(filtrados);
-}
-
-
-
-
-/**
- * Busca responsables en la lista global y muestra los resultados.
- * @param {number} num - Identificador del buscador (1 para Responsable 1, 2 para Responsable 2)
- */
-async function buscarResponsableEnModal(num) {
-    const input = document.getElementById(`search-resp${num}`);
-    const resultsDiv = document.getElementById(`results-resp${num}`);
-    const hiddenId = document.getElementById(`est-id-resp${num}`);
-    const query = input.value.toLowerCase().trim();
-
-    // Si el texto es muy corto, ocultamos la caja de resultados
-    if (query.length < 2) { 
-        resultsDiv.style.display = 'none'; 
-        hiddenId.value = ""; // Limpiamos el ID si el usuario borra el texto
-        return; 
-    }
-
-    // Si la lista de responsables no está cargada, la solicitamos una vez
-    if (!window.listaResponsables || window.listaResponsables.length === 0) {
-        const resp = await sendRequest('get_responsables');
-        window.listaResponsables = resp.data || [];
-    }
-
-    // Filtramos por DNI o por Nombre Completo
-    const filtrados = window.listaResponsables.filter(r => 
-        r.dni.toString().includes(query) || 
-        `${r.paterno} ${r.materno} ${r.nombres}`.toLowerCase().includes(query)
-    );
-
-    // Limpiamos resultados anteriores
-    resultsDiv.innerHTML = '';
-
-    if (filtrados.length > 0) {
-        resultsDiv.style.display = 'block';
-        
-        filtrados.slice(0, 5).forEach(r => { // Mostramos máximo 5 sugerencias
-            const div = document.createElement('div');
-            div.className = 'search-item';
-            div.innerHTML = `<strong>${r.dni}</strong> - ${r.paterno} ${r.nombres}`;
-            
-            // Acción al hacer clic en una sugerencia
-            div.onclick = () => {
-                input.value = `${r.paterno} ${r.nombres}`;
-                hiddenId.value = r.id; // Guardamos el ID en el campo oculto
-                resultsDiv.style.display = 'none';
-                input.style.borderColor = '#10b981'; // Cambio visual a verde (éxito)
-            };
-            resultsDiv.appendChild(div);
-        });
-    } else {
-        resultsDiv.style.display = 'none';
-    }
-}
 
 
 async function procesarGuardadoEstudiante(event) {
@@ -1080,14 +1187,10 @@ async function procesarGuardadoEstudiante(event) {
 }
 
 
-
 // Función para cerrar el mensaje de éxito
 function cerrarExito() {
     document.getElementById('modal-success').style.display = 'none';
 }
-
-
-
 
 
 /**
@@ -1095,82 +1198,75 @@ function cerrarExito() {
  * @param {string} id - ID del estudiante a editar.
  */
 function editarEstudiante(id) {
-    // 1. Nos aseguramos de que el formulario esté habilitado
-    configurarModoFormulario('form-estudiante', 'btn-save-est', false);
-    document.getElementById('modal-title-est').innerText = "Editar Estudiante";
-    
-    // 1. Buscar al estudiante en la lista global
-    const est = window.listaEstudiantes.find(e => e.id === id);
-    if (!est) {
-        console.error("Estudiante no encontrado con ID:", id);
-        return;
-    }
-
-    // --- LÍNEAS PARA RESETEAR EL BOTÓN ---
-    const btn = document.getElementById('btn-save-est');
-    if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = "GUARDAR ESTUDIANTE";
-    }
-    // -------------------------------------
-
-    // 2. Cambiar el título del modal para indicar edición
+    // 1. Preparar visualmente el modal
     const modalTitle = document.getElementById('modal-title-est');
-    if (modalTitle) modalTitle.innerText = "Editar Estudiante";
+    if (modalTitle) modalTitle.innerText = "Editar Información del Estudiante";
 
-    // 3. Llenar los campos básicos de identidad
-    document.getElementById('est-id').value = est.id;
-    document.getElementById('est-paterno').value = est.paterno;
-    document.getElementById('est-materno').value = est.materno;
-    document.getElementById('est-nombres').value = est.nombres;
-    document.getElementById('est-dni').value = est.dni;
-    document.getElementById('est-sexo').value = est.sexo;
-    document.getElementById('est-direccion').value = est.direccion;
-
-    // 4. Formatear la fecha para el input date (YYYY-MM-DD)
-    if (est.nacimiento) {
-        const fecha = new Date(est.nacimiento);
-        const yyyy = fecha.getFullYear();
-        const mm = String(fecha.getMonth() + 1).padStart(2, '0');
-        const dd = String(fecha.getDate()).padStart(2, '0');
-        document.getElementById('est-nacimiento').value = `${yyyy}-${mm}-${dd}`;
-    }
-
-    // 5. Cargar Responsable 1
-    document.getElementById('est-id-resp1').value = est.idResp1 || "";
-    // Aseguramos que el valor del select coincida exactamente con la opción (ej: "PADRE")
-    document.getElementById('est-parent1').value = est.parentesco1 || "PADRE";
+    configurarModoFormulario('form-estudiante', 'btn-save-est', false);
     
-    // Buscamos el nombre del responsable para mostrarlo en el buscador visual
-    const resp1 = window.listaResponsables.find(r => r.id === est.idResp1);
-    const searchInput1 = document.getElementById('search-resp1');
-    if (resp1 && searchInput1) {
-        searchInput1.value = `${resp1.paterno} ${resp1.nombres}`;
-        searchInput1.style.borderColor = '#10b981'; // Indica selección válida
-    }
+    // 2. Buscar datos en la lista global
+    const est = window.listaEstudiantes.find(e => e.id === id);
+    if (!est) return;
 
-    // 6. Cargar Responsable 2
-    const searchInput2 = document.getElementById('search-resp2');
-    if (est.idResp2) {
-        document.getElementById('est-id-resp2').value = est.idResp2;
-        document.getElementById('est-parent2').value = est.parentesco2 || "";
-        
-        const resp2 = window.listaResponsables.find(r => r.id === est.idResp2);
-        if (resp2 && searchInput2) {
-            searchInput2.value = `${resp2.paterno} ${resp2.nombres}`;
-            searchInput2.style.borderColor = '#10b981';
+    // 3. Llenado de campos de identidad
+    document.getElementById('est-id').value = est.id;
+    document.getElementById('est-dni').value = est.dni || "";
+    document.getElementById('est-paterno').value = est.paterno || "";
+    document.getElementById('est-materno').value = est.materno || "";
+    document.getElementById('est-nombres').value = est.nombres || "";
+    document.getElementById('est-sexo').value = est.sexo || "Masculino";
+    document.getElementById('est-direccion').value = est.direccion || "";
+
+    // 4. Formatear fecha (IMPORTANTE: El input type="date" requiere YYYY-MM-DD)
+    if (est.nacimiento) {
+        try {
+            const fecha = new Date(est.nacimiento);
+            const isoFecha = fecha.toISOString().split('T')[0];
+            document.getElementById('est-nacimiento').value = isoFecha;
+        } catch(e) {
+            document.getElementById('est-nacimiento').value = "";
         }
     } else {
-        // Limpiar si no tiene segundo responsable
-        document.getElementById('est-id-resp2').value = "";
-        document.getElementById('est-parent2').value = "";
-        if (searchInput2) {
-            searchInput2.value = "";
-            searchInput2.style.borderColor = '#e5e7eb';
-        }
+        document.getElementById('est-nacimiento').value = "";
     }
 
-    // 7. Mostrar el modal
+    // 5. Cargar Responsable 1 (Principal)
+    const idR1 = String(est.idResp1 || "");
+    document.getElementById('est-id-resp1').value = idR1;
+    document.getElementById('est-parent1').value = est.parentesco1 || "PADRE";
+    
+    const inputBusqueda1 = document.getElementById('search-resp1');
+    const resp1 = window.listaResponsables.find(r => String(r.id) === idR1);
+    
+    if (resp1) {
+        inputBusqueda1.value = `${resp1.paterno} ${resp1.materno || ''}, ${resp1.nombres}`.trim();
+        inputBusqueda1.style.borderColor = '#10b981'; // Borde verde de seleccionado
+    } else {
+        inputBusqueda1.value = "";
+        inputBusqueda1.style.borderColor = '#e2e8f0';
+    }
+
+    // 6. Cargar Responsable 2 (Secundario)
+    const idR2 = String(est.idResp2 || "");
+    document.getElementById('est-id-resp2').value = idR2;
+    document.getElementById('est-parent2').value = est.parentesco2 || "";
+    
+    const inputBusqueda2 = document.getElementById('search-resp2');
+    if (idR2) {
+        const resp2 = window.listaResponsables.find(r => String(r.id) === idR2);
+        if (resp2) {
+            inputBusqueda2.value = `${resp2.paterno} ${resp2.materno || ''}, ${resp2.nombres}`.trim();
+            inputBusqueda2.style.borderColor = '#10b981';
+        } else {
+            inputBusqueda2.value = idR2; // Si no lo encuentra, muestra el ID
+            inputBusqueda2.style.borderColor = '#e2e8f0';
+        }
+    } else {
+        inputBusqueda2.value = "";
+        inputBusqueda2.style.borderColor = '#e2e8f0';
+    }
+
+    // 7. Abrir el modal
     document.getElementById('modal-estudiante').style.display = 'flex';
 }
 
@@ -2077,13 +2173,12 @@ function actualizarBotonMatricula() {
 }
 
 /*--------------------------------------------------------------------*/
-/*CONSULTAS--------------------------------------------*/
+/*MÓDULO CONSULTAS--------------------------------------------*/
 let dataConsultas = {};
 
 /* --- ACTUALIZACIÓN EN SCRIPT.JS --- */
 
 function renderSeccionesConsultasView() {
-    // ... (Validación de roles igual que antes) ...
     const rolesPermitidos = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO', 'AUXILIAR'];
     if (!rolesPermitidos.includes(currentUser.role)) {
         lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tienes permisos para ver esta sección.');
@@ -2126,15 +2221,18 @@ function renderSeccionesConsultasView() {
 
         <div id="tab-seccion" class="tab-content">
             <div class="card-config" style="background:white; padding:20px; border-radius:12px; margin-bottom:20px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: flex-end;">
-                    <div><label>Año Académico</label><select id="con-anio" class="custom-select" onchange="actualizarFiltrosSeccion()"></select></div>
+                <div style="display: grid; grid-template-columns: 100px 1fr 1fr 1fr auto; gap: 15px; align-items: flex-end;">
+                    <div><label>Año</label><select id="con-anio" class="custom-select" onchange="actualizarFiltrosSeccion()"></select></div>
                     <div><label>Nivel</label><select id="con-nivel" class="custom-select" onchange="alCambiarNivel()"></select></div>
                     <div><label>Grado</label><select id="con-grado" class="custom-select" onchange="alCambiarGrado()"></select></div>
                     <div><label>Sección</label><select id="con-seccion" class="custom-select" onchange="consultarListaSeccion()"></select></div>
                     
-                    <div style="display: flex; justify-content: flex-end;">
-                        <button onclick="imprimirListaSeccion()" class="btn-primary" style="background: #475569; width: 100%;">
-                            <i class="material-icons">print</i> IMPRIMIR LISTA
+                    <div style="display: flex; flex-direction: column; gap: 8px; min-width: 180px;">
+                        <button onclick="imprimirListaSeccion()" class="btn-primary" style="background: #475569; width: 100%; height: 35px; font-size: 0.75rem; padding: 0 10px;">
+                            <i class="material-icons" style="font-size: 16px;">print</i> IMPRIMIR LISTA
+                        </button>
+                        <button onclick="imprimirNominaSeccion()" class="btn-primary" style="background: #1e293b; width: 100%; height: 35px; font-size: 0.75rem; padding: 0 10px;">
+                            <i class="material-icons" style="font-size: 16px;">assignment</i> IMPRIMIR NÓMINA
                         </button>
                     </div>
                 </div>
@@ -2245,16 +2343,32 @@ function filtrarHistorialEstudiante() {
 
 
 async function inicializarDataConsultas() {
-    const res = await sendRequest('get_consultas_secciones');
-    if (res.status === 'success') {
-        dataConsultas = res;
-        
-        // Llenar Año por default con el Activo
-        const comboAnio = document.getElementById('con-anio');
-        comboAnio.innerHTML = res.anios.map(a => `<option value="${a.id}" ${a.estado === 'ACTIVO' ? 'selected' : ''}>${a.nombre}</option>`).join('');
-        
-        actualizarFiltrosSeccion(); // Cargar niveles iniciales
+    let res = dataConsultasGlobal;
+
+    // FALLBACK: Si por alguna razón la precarga no terminó o falló, pedimos en ese momento
+    if (!res) {
+        console.log("⚠️ Precarga no lista, solicitando datos ahora...");
+        res = await sendRequest('get_consultas_secciones');
+        if (res.status === 'success') {
+            dataConsultasGlobal = res;
+        } else {
+            lanzarNotificacion('error', 'SISTEMA', 'No se pudieron cargar los filtros.');
+            return;
+        }
     }
+
+    // Usamos los datos (ya sea de la global o del fallback)
+    dataConsultas = res; 
+    
+    // Llenar Año por default
+    const comboAnio = document.getElementById('con-anio');
+    if (comboAnio) {
+        comboAnio.innerHTML = res.anios.map(a => 
+            `<option value="${a.id}" ${a.estado === 'ACTIVO' ? 'selected' : ''}>${a.nombre}</option>`
+        ).join('');
+    }
+    
+    actualizarFiltrosSeccion(); 
 }
 
 function switchTab(tabId) {
@@ -2447,7 +2561,7 @@ async function verExpediente(idEst, btn) {
             modal.style.display = 'flex';
             
             // Formatear fecha de nacimiento
-            const fechaNac = est[6] ? new Date(est[6]).toLocaleDateString('es-ES') : 'NO REGISTRADO';
+            const fechaNac = est[6] ? new Date(est[6]).toLocaleDateString('es-ES', { timeZone: 'UTC' }) : 'NO REGISTRADO';
 
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; padding: 30px;">
@@ -2512,9 +2626,9 @@ async function verExpediente(idEst, btn) {
                             ${res.historial.map(h => `
                                 <tr>
                                     <td>${h.anio}</td>
-                                    <td>${h.detalle.toUpperCase()}</td>
-                                    <td>${new Date(h.fecha).toLocaleDateString()}</td>
-                                    <td><span class="badge" style="background:${h.estado === 'ACTIVO' ? '#22c55e' : '#ef4444'}; color:white;">${h.estado}</span></td>
+                                    <td style="font-weight:600;">${h.detalle.toUpperCase()}</td>
+                                    <td>${h.fecha ? new Date(h.fecha).toLocaleDateString('es-ES', { timeZone: 'UTC' }) : '---'}</td>
+                                    <td><span class="badge" style="background:${h.estado === 'ACTIVO' ? '#10b981' : '#ef4444'}; color:white; padding: 4px 8px; border-radius:6px; font-size:10px;">${h.estado}</span></td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -2714,6 +2828,124 @@ async function confirmarCambioSeccion(idMat) {
         btn.disabled = false;
     }
 }
+
+async function imprimirNominaSeccion() {
+    const idSeccion = document.getElementById('con-seccion').value;
+    const anio = document.getElementById('con-anio').options[document.getElementById('con-anio').selectedIndex]?.text;
+    const grado = document.getElementById('con-grado').options[document.getElementById('con-grado').selectedIndex]?.text;
+    const seccion = document.getElementById('con-seccion').options[document.getElementById('con-seccion').selectedIndex]?.text;
+
+    if (!idSeccion) return lanzarNotificacion('error', 'ERROR', 'Seleccione una sección primero.');
+
+    const btn = document.querySelector('button[onclick="imprimirNominaSeccion()"]');
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="material-icons rotate">sync</i> PROCESANDO...';
+    btn.disabled = true;
+
+    try {
+        const res = await sendRequest('get_nomina_completa', { idSeccion: idSeccion });
+
+        if (res.status === 'success') {
+            const data = res.data; 
+            
+            const ventana = window.open('', '_blank');
+            ventana.document.write(`
+                <html>
+                <head>
+                    <title>Nómina - ${grado} ${seccion}</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+                        body { font-family: 'Roboto', sans-serif; font-size: 10px; margin: 0; padding: 20px; color: #334155; }
+                        
+                        .header { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end; }
+                        h1 { color: #1e3a8a; margin: 0; font-size: 18px; }
+                        
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+                        th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 2px; font-size: 8.5px; text-align: center; color: #1e40af; }
+                        td { border: 1px solid #cbd5e1; padding: 5px 3px; vertical-align: middle; }
+
+                        /* AJUSTES DE FUENTE SOLICITADOS */
+                        .col-estudiante { font-size: 10px; } /* Tamaño para datos de alumno */
+                        .text-bold { font-weight: bold; color: #0f172a; }
+                        
+                        .responsable-box { 
+                            font-size: 10px; /* Tamaño mayor para responsables */
+                            line-height: 1.3; 
+                        }
+                        .telf-bold { font-weight: 700; color: #2563eb; font-size: 10px; } /* Celular resaltado */
+
+                        .text-center { text-align: center; }
+                        
+                        @media print {
+                            @page { size: A4 landscape; margin: 8mm; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div>
+                            <h1>NÓMINA DE MATRÍCULA - ${anio}</h1>
+                            <div style="font-weight:bold; font-size:12px;">GRADO: ${grado} | SECCIÓN: "${seccion}"</div>
+                        </div>
+                        <div style="text-align:right; font-size:9px;">Generado el: ${new Date().toLocaleString()}</div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 25px;">N°</th>
+                                <th style="width: 65px;">DNI</th>
+                                <th>APELLIDOS Y NOMBRES</th>
+                                <th style="width: 35px;">SEXO</th>
+                                <th style="width: 75px;">F. NACIMIENTO</th>
+                                <th style="width: 180px;">DIRECCIÓN</th>
+                                <th>RESPONSABLE 1 (PRINCIPAL)</th>
+                                <th>RESPONSABLE 2</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map((est, index) => {
+                                // LÓGICA PARA ABREVIAR SEXO
+                                const sexoAbrev = String(est.sexo || '').trim().toUpperCase().startsWith('M') ? 'M' : 'F';
+                                
+                                return `
+                                <tr>
+                                    <td class="text-center col-estudiante">${index + 1}</td>
+                                    <td class="text-center text-bold col-estudiante">${est.dni}</td>
+                                    <td class="text-bold col-estudiante">${est.paterno} ${est.materno}, ${est.nombres}</td>
+                                    <td class="text-center col-estudiante">${sexoAbrev}</td>
+                                    <td class="text-center col-estudiante">${est.nacimiento ? new Date(est.nacimiento).toLocaleDateString() : '-'}</td>
+                                    <td style="font-size: 8px;">${est.direccion || '-'}</td>
+                                    <td class="responsable-box">
+                                        <div class="text-bold">${est.r1_nombre || 'No asignado'}</div>
+                                        <div style="font-size: 8px;">Par: ${est.r1_par || '-'} | <span class="telf-bold">Cel: ${est.r1_telf || '-'}</span></div>
+                                    </td>
+                                    <td class="responsable-box">
+                                        <div class="text-bold">${est.r2_nombre || '-'}</div>
+                                        <div style="font-size: 8px;"><span class="telf-bold">${est.r2_telf ? 'Cel: ' + est.r2_telf : ''}</span></div>
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    <script>window.onload = function() { window.print(); }</script>
+                </body>
+                </html>
+            `);
+            ventana.document.close();
+        }
+    } catch (e) {
+        console.error(e);
+        lanzarNotificacion('error', 'SISTEMA', 'No se pudo generar la nómina.');
+    } finally {
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
+}
+
+
+
 
 /*VER TRASLADOS---------------------------------------*/
 let datosTrasladosLocal = []; // Para filtrar sin recargar del servidor
@@ -3500,6 +3732,7 @@ function cargarConceptosParaEstudiante(idSecEstudiante) {
 }
 
 
+
 /*NUEVO RECIBO-------------------------------------------*/
 /* =========================================
    MÓDULO: NUEVO RECIBO - FASE 1 (CORREGIDA)
@@ -4244,6 +4477,20 @@ async function enviarProcesarRecibo() {
         if (res.status === 'success') {
             console.log(`Recibo N° ${res.nroRecibo} guardado.`);
 
+            // --- AGREGA ESTAS LÍNEAS PARA LIMPIAR LA CACHÉ ---
+            if (typeof cacheCajaSesion !== 'undefined') cacheCajaSesion.clear();
+            dataCajaHoyGlobal = null; 
+            // ------------------------------------------------
+
+            // --- AQUÍ ACTUALIZAMOS LA DATA PRECARGADA ---
+            // Al setearlo en null, la sección de REPORTES sabrá que debe
+            // descargar los datos nuevos cuando el usuario entre allí.
+            dataReportePagosGlobal = null; 
+            // --------------------------------------------
+            // Disparamos la precarga silenciosa sin el "await" 
+            // para que ocurra mientras el usuario imprime el recibo.
+            preCargarDataReportes();
+
             // Preparamos datos para el PDF/Ticket
             const copiaBorrador = JSON.parse(JSON.stringify(borradorRecibo));
             const mDig = tieneDigital ? medioDig : "";
@@ -4279,52 +4526,6 @@ async function enviarProcesarRecibo() {
     }
 }
 
-/*
-function preguntarAccionRecibo(nro, datos, medio, cod, obs) {
-    // Usamos el sistema de notificaciones que ya tienes para mostrar la elección
-    // Nota: Ajusta 'lanzarNotificacion' si tu sistema no permite inyectar HTML complejo, 
-    // de lo contrario, usa un SweetAlert o un div flotante.
-    
-    const areaNotif = document.getElementById('notification-area'); // O el ID de tu contenedor de avisos
-    
-    const htmlEleccion = `
-        <div id="modal-eleccion-recibo" style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; border-top: 5px solid #2563eb;">
-            <i class="material-icons" style="font-size: 40px; color: #10b981;">check_circle</i>
-            <h3 style="margin: 10px 0;">¡Recibo Generado!</h3>
-            <p>¿Qué desea hacer con el <b>N° ${nro}</b>?</p>
-            
-            <div class="choice-container">
-                <button class="btn-choice btn-print" id="opt-imprimir">
-                    <i class="material-icons">print</i> IMPRIMIR
-                </button>
-                <button class="btn-choice btn-pdf" id="opt-pdf">
-                    <i class="material-icons">picture_as_pdf</i> DESCARGAR
-                </button>
-            </div>
-            
-            <button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; background:none; border:none; color:#64748b; cursor:pointer; text-decoration:underline;">Cerrar sin acciones</button>
-        </div>
-    `;
-
-    // Mostramos el modal (puedes adaptarlo a tu función lanzarNotificacion)
-    const overlay = document.createElement('div');
-    overlay.id = "overlay-eleccion";
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999;";
-    overlay.innerHTML = htmlEleccion;
-    document.body.appendChild(overlay);
-
-    // ASIGNAR EVENTOS A LOS BOTONES
-    document.getElementById('opt-imprimir').onclick = () => {
-        imprimirTicket(nro, datos, medio, cod, obs);
-        document.body.removeChild(overlay);
-    };
-
-    document.getElementById('opt-pdf').onclick = () => {
-        descargarTicketPDF(datos, nro);
-        document.body.removeChild(overlay);
-    };
-}
-*/
 
 /*------ FUNCIÓN MODAL DESPUÉS DE PAGO -------*/
 function preguntarAccionRecibo(nro, datosLocales, medio, cod, obs) {
@@ -5339,20 +5540,17 @@ async function guardarEgreso() {
     const monto = parseFloat(document.getElementById('new-egr-monto').value);
     const obs = document.getElementById('new-egr-obs').value.trim();
 
-    // Validación simplificada (ya no validamos fecha)
     if (!concepto || isNaN(monto) || monto <= 0) {
         lanzarNotificacion('error', 'DATOS INCOMPLETOS', 'Ingrese un concepto válido y un monto mayor a 0.');
         return;
     }
 
-    // Bloqueo visual
     const btn = document.querySelector('#modal-body .btn-primary');
     const txtOriginal = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> GUARDANDO...';
 
     try {
-        // Ya no enviamos la fecha, el servidor la pone sola
         const res = await sendRequest('save_egreso', {
             concepto: concepto,
             monto: monto,
@@ -5360,18 +5558,24 @@ async function guardarEgreso() {
         });
 
         if (res.status === 'success') {
+            // ============================================================
+            // --- LIMPIEZA DE CACHÉ (SINCRONIZACIÓN CON CAJA DIARIA) ---
+            // ============================================================
+            // Borramos la memoria local de la sesión para que al volver a Caja
+            // se obligue a descargar los nuevos totales (incluyendo este gasto).
+            if (typeof cacheCajaSesion !== 'undefined') cacheCajaSesion.clear();
+            dataCajaHoyGlobal = null; 
+            // ============================================================
+
             lanzarNotificacion('success', 'REGISTRADO', 'El gasto se guardó correctamente.');
             cerrarModal();
             
-            // Recargamos la tabla. Como el gasto es "HOY", y la vista por defecto es "HOY",
-            // aseguramos que el usuario vea su registro si está consultando la fecha actual.
             const fechaVista = document.getElementById('egreso-fecha').value;
-            const hoyStr = new Date().toISOString().split('T')[0]; // Fecha actual YYYY-MM-DD
+            const hoyStr = new Date().toISOString().split('T')[0];
             
             if (fechaVista === hoyStr) {
                 cargarTablaEgresos();
             } else {
-                // Si el usuario estaba viendo el historial de ayer y registra un gasto hoy:
                 lanzarNotificacion('info', 'REGISTRO EXITOSO', 'El gasto se registró con fecha de hoy.');
             }
 
@@ -5389,73 +5593,120 @@ async function guardarEgreso() {
     }
 }
 
+
 //---------------------------------------------------------------------
-/* --- MÓDULO CAJA DIARIA --- */
+/* --- MÓDULO CAJA DIARIA OPTIMIZADO --- */
 
-let cacheEgresosDia = []; // Guardaremos los egresos aquí para mostrarlos en el modal sin recargar
-let cacheIngresosCaja = []; // <--- NUEVA CACHÉ
+let cacheEgresosDia = []; 
+let cacheIngresosCaja = []; 
+// Nueva memoria de sesión: Guardará los resultados de cada fecha consultada
+const cacheCajaSesion = new Map(); 
 
-async function cargarCajaDiaria() {
-    const fecha = document.getElementById('caja-fecha').value;
+async function cargarCajaDiaria(isRefresh = false) {
+    const fechaSeleccionada = document.getElementById('caja-fecha').value;
+    const hoy = new Date().toISOString().split('T')[0];
     const tbody = document.getElementById('body-caja-ingresos');
-    const lEfe = document.getElementById('lbl-tot-efectivo');
-    const lEgr = document.getElementById('lbl-tot-egresos');
-    const lBal = document.getElementById('lbl-balance');
-    const lDig = document.getElementById('lbl-tot-digital');
+    
+    // Referencia al ícono y al botón
+    const icono = document.getElementById('icon-refresh-caja');
+    const btn = icono ? icono.parentElement : null;
 
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 30px;"><div class="spinner"></div> Procesando caja...</td></tr>`;
-    const estiloCell = `padding: 6px 10px !important; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
+    // --- ACTIVAR ROTACIÓN Y BLOQUEAR BOTÓN ---
+    if (icono) icono.classList.add('rotate-icon');
+    if (btn) btn.disabled = true;
+
+    if (isRefresh) {
+        if (typeof cacheCajaSesion !== 'undefined') cacheCajaSesion.delete(fechaSeleccionada);
+        if (fechaSeleccionada === hoy) dataCajaHoyGlobal = null;
+    }
+
+    if (!isRefresh && cacheCajaSesion.has(fechaSeleccionada)) {
+        mostrarDatosEnTablaCaja(cacheCajaSesion.get(fechaSeleccionada));
+        // Quitamos rotación si cargó de caché
+        if (icono) icono.classList.remove('rotate-icon');
+        if (btn) btn.disabled = false;
+        return;
+    }
+
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 50px;"><div class="spinner"></div> Sincronizando...</td></tr>`;
 
     try {
-        const res = await sendRequest('get_caja_diaria', { fecha: fecha });
-
+        const res = await sendRequest('get_caja_diaria', { 
+            fecha: fechaSeleccionada, 
+            refresh: isRefresh 
+        });
+        
         if (res.status === 'success') {
-            const r = res.resumen;
-            cacheEgresosDia = res.detalleEgresos;
-            
-            // 1. GUARDAMOS EN CACHÉ
-            cacheIngresosCaja = res.detalleIngresos; 
-
-            // Totales
-            const saldoFisico = r.efectivo - r.egresos;
-            lEfe.innerText = `S/ ${r.efectivo.toFixed(2)}`;
-            lEgr.innerText = `S/ ${r.egresos.toFixed(2)}`;
-            lBal.innerText = `S/ ${saldoFisico.toFixed(2)}`;
-            lDig.innerText = `S/ ${r.digital.toFixed(2)}`;
-            lBal.style.color = (saldoFisico < 0) ? '#fca5a5' : '#fff';
-
-            // Tabla
-            if (res.detalleIngresos.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 20px; color: #666;">Sin movimientos de ingreso.</td></tr>`;
-            } else {
-                tbody.innerHTML = res.detalleIngresos.map(i => `
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                        <td style="${estiloCell} font-weight:700;">${i.nro}</td>
-                        <td style="${estiloCell}" title="${i.estudiante}">${i.estudiante}</td>
-                        <td style="${estiloCell}" title="${i.concepto}">${i.concepto}</td>
-                        <td style="${estiloCell} text-align: right; color: #16a34a; font-weight:600;">${i.efectivo > 0 ? i.efectivo.toFixed(2) : '-'}</td>
-                        <td style="${estiloCell} text-align: right; color: #0ea5e9; font-weight:600;">${i.digital > 0 ? i.digital.toFixed(2) : '-'}</td>
-                        <td style="${estiloCell}">
-                            ${i.medio ? `<span style="background:#f0f9ff; padding:1px 5px; border-radius:4px; color:#0369a1; font-size:0.75rem;">${i.medio}</span>` : ''}
-                        </td>
-                        <td style="${estiloCell} font-family: monospace; color: #64748b;">${i.codOp || ''}</td>
-                        <td style="${estiloCell} text-align: right; font-weight: 800;">${i.total.toFixed(2)}</td>
-                        <td style="${estiloCell} text-align: center;">
-                            <button onclick="verDetalleCajaLocal('${i.nro}')" class="btn-icon view" style="width: 28px; height: 28px; font-size: 0.9rem; padding: 0;">
-                                <i class="material-icons" style="font-size: 16px;">visibility</i>
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
+            cacheCajaSesion.set(fechaSeleccionada, res);
+            if (fechaSeleccionada === hoy) dataCajaHoyGlobal = res;
+            mostrarDatosEnTablaCaja(res);
         } else {
             lanzarNotificacion('error', 'ERROR', res.message);
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px;">${res.message}</td></tr>`;
         }
     } catch (error) {
         console.error(error);
-        lanzarNotificacion('error', 'CONEXIÓN', 'No se pudo cargar la caja.');
+        lanzarNotificacion('error', 'CONEXIÓN', 'Error de red.');
+    } finally {
+        // --- DESACTIVAR ROTACIÓN SIEMPRE AL TERMINAR ---
+        setTimeout(() => { // Un pequeño delay de 300ms para que se note la vuelta
+            if (icono) icono.classList.remove('rotate-icon');
+            if (btn) btn.disabled = false;
+        }, 300);
     }
 }
+
+function mostrarDatosEnTablaCaja(res) {
+    const r = res.resumen;
+    const tbody = document.getElementById('body-caja-ingresos');
+    
+    // Optimizamos: Referenciamos los elementos una sola vez
+    const stats = {
+        efe: document.getElementById('lbl-tot-efectivo'),
+        egr: document.getElementById('lbl-tot-egresos'),
+        bal: document.getElementById('lbl-balance'),
+        dig: document.getElementById('lbl-tot-digital')
+    };
+
+    cacheEgresosDia = res.detalleEgresos;
+    cacheIngresosCaja = res.detalleIngresos;
+
+    // Actualización de totales
+    const saldoFisico = r.efectivo - r.egresos;
+    stats.efe.innerText = `S/ ${r.efectivo.toFixed(2)}`;
+    stats.egr.innerText = `S/ ${r.egresos.toFixed(2)}`;
+    stats.dig.innerText = `S/ ${r.digital.toFixed(2)}`;
+    stats.bal.innerText = `S/ ${saldoFisico.toFixed(2)}`;
+    stats.bal.style.color = (saldoFisico < 0) ? '#fca5a5' : '#fff';
+
+    // Renderizado por lotes (Batch Rendering)
+    if (res.detalleIngresos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 40px; color: #94a3b8; font-style: italic;">No hay movimientos.</td></tr>`;
+        return;
+    }
+
+    const estiloCell = `padding: 10px 12px !important; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9;`;
+    
+    // Construimos todo el HTML en memoria antes de tocar el DOM
+    const fragmento = res.detalleIngresos.map(i => `
+        <tr style="animation: fadeIn 0.3s ease-out;">
+            <td style="${estiloCell} font-weight:700;">${i.nro}</td>
+            <td style="${estiloCell} white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${i.estudiante}</td>
+            <td style="${estiloCell}">${i.concepto}</td>
+            <td style="${estiloCell} text-align: right; color: #16a34a; font-weight:700;">${i.efectivo > 0 ? i.efectivo.toFixed(2) : '-'}</td>
+            <td style="${estiloCell} text-align: right; color: #2563eb; font-weight:700;">${i.digital > 0 ? i.digital.toFixed(2) : '-'}</td>
+            <td style="${estiloCell}"><span class="badge-mini">${i.medio || 'EFE'}</span></td>
+            <td style="${estiloCell} font-family: monospace; font-size: 0.75rem;">${i.codOp || ''}</td>
+            <td style="${estiloCell} text-align: right; font-weight: 800;">${i.total.toFixed(2)}</td>
+            <td style="${estiloCell} text-align: center;">
+                <button onclick="verDetalleCajaLocal('${i.nro}')" class="btn-icon view"><i class="material-icons" style="font-size: 18px;">visibility</i></button>
+            </td>
+        </tr>
+    `).join('');
+
+    tbody.innerHTML = fragmento;
+}
+
 
 // --- NUEVA FUNCIÓN: APERTURA INSTANTÁNEA ---
 function verDetalleCajaLocal(nro) {
@@ -5483,7 +5734,7 @@ function verDetalleCajaLocal(nro) {
 
 function renderCajaView() {
     // 1. Permisos
-    const roles = ['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'];
+    const roles = ['ADMINISTRADOR', 'DIRECTIVO'];
     if (!roles.includes(currentUser.role)) {
         lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tiene permisos de tesorería.');
         return;
@@ -5507,18 +5758,14 @@ function renderCajaView() {
                 <h2>Caja Diaria</h2>
                 <p>Cuadre de dinero físico y movimientos.</p>
             </div>
-            <div class="anio-indicador" style="background-color: #ecfccb !important; color: #3f6212 !important; border-color: #d9f99d !important;">
-                <i class="material-icons">point_of_sale</i>
-                <span>TESORERÍA</span>
-            </div>
         </div>
 
         <div class="card-config" style="background: white; padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 15px;">
             <label style="font-weight: 700; color: #555; font-size: 0.9rem;">FECHA CIERRE:</label>
             <input type="date" id="caja-fecha" value="${hoy}" onchange="cargarCajaDiaria()" 
                    style="padding: 6px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-family: var(--font-main); font-size: 0.95rem; color: var(--sidebar-dark); font-weight: 600;">
-            <button class="btn-icon view" onclick="cargarCajaDiaria()" title="Actualizar" style="width: 34px; height: 34px;">
-                <i class="material-icons" style="font-size: 18px;">refresh</i>
+            <button class="btn-icon view" onclick="cargarCajaDiaria(true)" title="Actualizar" style="width: 34px; height: 34px;">
+                <i id="icon-refresh-caja" class="material-icons" style="font-size: 18px;">refresh</i>
             </button>
         </div>
 
@@ -6882,51 +7129,52 @@ function imprimirListaSeccion() {
                 }
                 
                 th {
-                    background-color: #2563eb; 
+                    background-color: #4a81f8; 
                     color: white;
                     padding: 4px 2px;
                     border: 1px solid #1e40af;
                     font-weight: 600;
                     font-size: 9px;
                     text-align: center;
-                    height: 20px; /* Espacio para escribir fecha en el encabezado */
+                    height: 50px; /* Espacio para escribir fecha en el encabezado */
                 }
 
                 td {
                     border: 1px solid #94a3b8; /* Borde visible para guiar la escritura */
                     padding: 3px 5px;
                     font-size: 10px;
-                    height: 18px; 
+                    height: 27px; 
+                    vertical-align: middle;
                 }
 
                 /* ANCHOS DE COLUMNAS (Total 100%) */
                 .col-nro { 
-                    width: 4%; 
+                    width: 2%; 
                     text-align: center; 
-                    background: #f1f5f9; 
                     font-weight: bold;
+                    background-color: #2563eb; 
+                    color: white;
+                    border: 1px solid #1e40af;
                 }
                 
                 .col-nombre { 
-                    width: 36%; /* Espacio suficiente para apellidos largos */
+                    width: 38%; /* Espacio suficiente para apellidos largos */
                     text-align: left;
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis; 
                     text-transform: uppercase;
+                    font-size: 12px;
                 }
 
                 /* El 60% restante se divide entre las 12 columnas vacías (5% c/u) */
                 .casillero { width: 5%; }
 
                 /* EFECTO CEBRA SUAVE */
-                tr:nth-child(even) { background-color: #f8fafc; }
+                tr:nth-child(even) { background-color: #e2f1ff; }
 
                 @media print {
-                    @page { 
-                        size: A4 portrait; 
-                        margin: 8mm 10mm; /* Márgenes ajustados para aprovechar la hoja */
-                    }
+                    @page { size: A4 portrait; margin: 10mm; }
                     body { -webkit-print-color-adjust: exact; }
                 }
             </style>
@@ -6972,12 +7220,27 @@ function imprimirListaSeccion() {
 }
 
 /*-------------------------------------------------------------------*/
-/* --- AÑADIR AL MODULO DE REPORTES O CAJA EN SCRIPT.JS --- */
+/* --- MÓDULO DE REPORTES O CAJA EN SCRIPT.JS --- */
 
 let cacheReportePagos = {}; // Para guardar los datos descargados
 let tabReporteActual = 'REGULAR'; // 'REGULAR' o 'ADICIONAL'
 
-function renderReportesPagosView() {
+async function preCargarDataReportes() {
+    if (dataReportePagosGlobal) return; // Si ya existe, no duplicar petición
+
+    try {
+        // Pedimos toda la data financiera del año activo
+        const res = await sendRequest('get_reporte_pagos', { idAnio: anioActivoID });
+        if (res.status === 'success') {
+            dataReportePagosGlobal = res;
+            console.log("📈 Data de Reportes precargada.");
+        }
+    } catch (e) {
+        console.error("Error en precarga de reportes:", e);
+    }
+}
+
+function renderReportesPagosView() {actualizarSelectsNivelGradoReporte
     // 1. Verificar Permisos
     if (!['ADMINISTRADOR', 'SECRETARIA', 'DIRECTIVO'].includes(currentUser.role)) {
         lanzarNotificacion('error', 'ACCESO DENEGADO', 'No tienes permisos para ver reportes financieros.');
@@ -6992,9 +7255,6 @@ function renderReportesPagosView() {
             <div>
                 <h2>Reporte de Pagos y Deudas</h2>
                 <p>Estado de cuenta en tiempo real por aula.</p>
-            </div>
-            <div style="background: #e0f2fe; color: #0284c7; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9rem;">
-                <i class="material-icons" style="font-size: 16px; vertical-align: text-top;">insights</i> Análisis Financiero
             </div>
         </div>
 
@@ -7015,29 +7275,29 @@ function renderReportesPagosView() {
                 
                 <div style="width: 100px;">
                     <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Año</label>
-                    <select id="rep-anio" class="form-input" disabled style="background: #f8fafc;">
+                    <select id="rep-anio" class="form-input" disabled style="background: #f8fafc; font-size: 1.1rem;">
                         <option value="${anioActivoID}">${anioActivoNombre}</option>
                     </select>
                 </div>
 
                 <div style="width: 140px;">
                     <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Nivel</label>
-                    <select id="rep-nivel" class="form-input" onchange="alCambiarNivelReporte()"></select>
+                    <select id="rep-nivel" class="form-input" style="font-size: 1.1rem;" onchange="alCambiarNivelReporte()"></select>
                 </div>
 
                 <div style="width: 140px;">
                     <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Grado</label>
-                    <select id="rep-grado" class="form-input" onchange="alCambiarGradoReporte()"></select>
+                    <select id="rep-grado" class="form-input" style="font-size: 1.1rem;" onchange="alCambiarGradoReporte()"></select>
                 </div>
 
                 <div style="width: 100px;">
                     <label class="form-label" style="font-size: 0.85rem; color: #64748b;">Sección</label>
-                    <select id="rep-seccion" class="form-input" onchange="alCambiarSeccionReporte()"></select>
+                    <select id="rep-seccion" class="form-input" style="font-size: 1.1rem;" onchange="alCambiarSeccionReporte()"></select>
                 </div>
                 
                 <div style="flex-grow: 1; min-width: 250px;">
-                    <label class="form-label" style="color:#2563eb; font-weight: 700;">Seleccione Concepto a Evaluar</label>
-                    <select id="rep-concepto" class="form-input" style="border: 2px solid #bfdbfe; font-weight: 600; color: #1e293b;" onchange="generarReporteDeuda()"></select>
+                    <label class="form-label" style="color:#2563eb; font-size: 0.85rem; font-weight: 700;">Seleccione Concepto a Evaluar</label>
+                    <select id="rep-concepto" class="form-input" style="border: 2px solid #bfdbfe; font-size: 1.1rem; font-weight: 600; color: #1e293b;" onchange="generarReporteDeuda()"></select>
                 </div>
 
             </div>
@@ -7106,20 +7366,26 @@ function renderReportesPagosView() {
 }
 
 async function cargarDatosInicialesReporte() {
-    // 1. Cargar los niveles desde la memoria global
+    // 1. Cargamos Niveles/Grados/Secciones (que ya deben estar en tu global de configuración)
     actualizarSelectsNivelGradoReporte(); 
 
-    // 2. Traer la data financiera del servidor
-    try {
-        const res = await sendRequest('get_reporte_pagos', { idAnio: anioActivoID });
-        if (res.status === 'success') {
-            cacheReportePagos = res;
-            actualizarComboConceptos(); // Llenar conceptos según la pestaña activa
-        }
-    } catch (e) { console.error(e); }
+    // 2. ¿La data ya está precargada?
+    if (dataReportePagosGlobal) {
+        cacheReportePagos = dataReportePagosGlobal;
+        actualizarComboConceptos(); // Esto ahora será instantáneo
+    } else {
+        // Fallback: Si el usuario fue muy rápido y la precarga no terminó
+        try {
+            const res = await sendRequest('get_reporte_pagos', { idAnio: anioActivoID });
+            if (res.status === 'success') {
+                dataReportePagosGlobal = res;
+                cacheReportePagos = res;
+                actualizarComboConceptos();
+            }
+        } catch (e) { console.error(e); }
+    }
 }
 
-/* --- REEMPLAZA LA FUNCIÓN cambiarTabReporte --- */
 
 function cambiarTabReporte(tipo) {
     // 1. Actualizar variable global
@@ -7146,88 +7412,6 @@ function cambiarTabReporte(tipo) {
     limpiarResultadosReporte();
 }
 
-function actualizarComboConceptos() {
-    const select = document.getElementById('rep-concepto');
-    select.innerHTML = '<option value="">-- Seleccione --</option>';
-    
-    if (!cacheReportePagos.conceptos) return;
-
-    // Filtramos conceptos por el tipo de la pestaña actual
-    const filtrados = cacheReportePagos.conceptos.filter(c => c.tipo === tabReporteActual);
-    
-    select.innerHTML += filtrados.map(c => 
-        `<option value="${c.id}" data-monto="${c.monto}">${c.nombre} (S/ ${c.monto})</option>`
-    ).join('');
-}
-
-/*
-function generarReporteDeuda() {
-    const idSec = document.getElementById('rep-seccion').value;
-    const idCon = document.getElementById('rep-concepto').value;
-    
-    const bodyDeuda = document.getElementById('body-deuda');
-    const bodyPagado = document.getElementById('body-pagado');
-    const countDeuda = document.getElementById('count-deuda');
-    const countPagado = document.getElementById('count-pagado');
-
-    if (!idSec || !idCon) {
-        const msg = '<tr><td colspan="2" style="text-align:center; padding:30px; color:#cbd5e1;">Faltan filtros</td></tr>';
-        bodyDeuda.innerHTML = msg; bodyPagado.innerHTML = msg;
-        return;
-    }
-
-    const conceptoObj = cacheReportePagos.conceptos.find(c => String(c.id) === String(idCon));
-    const precioBase = conceptoObj ? parseFloat(conceptoObj.monto) : 0;
-    const matriculados = cacheReportePagos.matriculas.filter(m => String(m.idSec) === String(idSec));
-
-    let listaDeuda = [];
-    let listaPagado = [];
-
-    matriculados.forEach(mat => {
-        const est = cacheReportePagos.estudiantes.find(e => String(e.id) === String(mat.idEst));
-        if (!est) return;
-
-        const misDescuentos = cacheReportePagos.descuentos.filter(d => String(d.idEst) === String(mat.idEst) && String(d.idCon) === String(idCon));
-        const totalDescuento = misDescuentos.reduce((sum, d) => sum + parseFloat(d.monto), 0);
-        const misPagos = cacheReportePagos.pagos.filter(p => String(p.idEst) === String(mat.idEst) && String(p.idCon) === String(idCon));
-        const totalPagado = misPagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
-
-        const montoA_Pagar = precioBase - totalDescuento;
-        const deuda = montoA_Pagar - totalPagado;
-        const ultimoRecibo = misPagos.length > 0 ? misPagos[misPagos.length - 1].recibo : '---';
-
-        if (deuda > 0.1) {
-            listaDeuda.push({ nombre: est.nombre, deuda: deuda });
-        } else {
-            listaPagado.push({ nombre: est.nombre, recibo: misPagos.length > 1 ? 'Varios' : ultimoRecibo });
-        }
-    });
-
-    // RENDER DEUDORES
-    listaDeuda.sort((a,b) => a.nombre.localeCompare(b.nombre));
-    countDeuda.innerText = listaDeuda.length;
-    bodyDeuda.innerHTML = listaDeuda.length ? listaDeuda.map(item => `
-        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
-            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
-            <td style="padding: 12px 20px; text-align:right; font-weight: 700; color: #ef4444; font-family: monospace; font-size: 1.1rem;">S/ ${item.deuda.toFixed(2)}</td>
-        </tr>
-    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#16a34a; background:#f0fdf4;"><i class="material-icons" style="font-size:30px; display:block; margin-bottom:5px;">thumb_up_alt</i>¡Excelente! Todos han pagado.</td></tr>`;
-
-    // RENDER PAGADOS
-    listaPagado.sort((a,b) => a.nombre.localeCompare(b.nombre));
-    countPagado.innerText = listaPagado.length;
-    bodyPagado.innerHTML = listaPagado.length ? listaPagado.map(item => `
-        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
-            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
-            <td style="padding: 12px 20px; text-align:center;">
-                <span style="font-family:monospace; color:#15803d; background:#dcfce7; padding: 3px 8px; border-radius: 6px; font-weight:600; font-size: 1.1rem;">
-                    <i class="material-icons" style="font-size:12px; vertical-align:middle;">receipt</i> ${item.recibo}
-                </span>
-            </td>
-        </tr>
-    `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#94a3b8;">Ningún pago registrado aún.</td></tr>`;
-}
-*/
 
 function generarReporteDeuda() {
     const idSec = document.getElementById('rep-seccion').value;
@@ -7282,8 +7466,8 @@ function generarReporteDeuda() {
     countDeuda.innerText = listaDeuda.length;
     bodyDeuda.innerHTML = listaDeuda.length ? listaDeuda.map(item => `
         <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
-            <td style="padding: 12px 20px; color: #334155; font-size: 0.95rem;">${item.nombre}</td>
-            <td style="padding: 12px 20px; text-align:right; font-weight: 700; color: #ef4444; font-family: monospace; font-size: 0.95rem;">S/ ${item.deuda.toFixed(2)}</td>
+            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; text-align:right; font-weight: 700; color: #ef4444; font-family: monospace; font-size: 1.1rem;">S/ ${item.deuda.toFixed(2)}</td>
         </tr>
     `).join('') : `<tr><td colspan="2" style="text-align:center; padding:30px; color:#16a34a; background:#f0fdf4;"><i class="material-icons" style="font-size:30px; display:block; margin-bottom:5px;">thumb_up_alt</i>¡Excelente! Todos han pagado.</td></tr>`;
 
@@ -7292,7 +7476,7 @@ function generarReporteDeuda() {
     countPagado.innerText = listaPagado.length;
     bodyPagado.innerHTML = listaPagado.length ? listaPagado.map(item => `
         <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
-            <td style="padding: 12px 20px; color: #334155; font-size: 0.95rem;">${item.nombre}</td>
+            <td style="padding: 12px 20px; color: #334155; font-size: 1.1rem;">${item.nombre}</td>
             <td style="padding: 12px 20px; text-align:center;">
                 <button onclick="verDetallePagosReporte('${item.idEst}', '${idCon}', '${item.nombre}')" 
                    style="font-family:monospace; color:#15803d; background:#dcfce7; padding: 5px 10px; border: 1px solid #86efac; border-radius: 6px; font-weight:600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;">
@@ -7460,6 +7644,7 @@ function alCambiarSeccionReporte() {
 
 // 2. Función de filtrado actualizada
 /* --- EN SCRIPT.JS --- */
+
 
 function actualizarComboConceptos() {
     const select = document.getElementById('rep-concepto');
