@@ -2229,7 +2229,7 @@ function renderSeccionesConsultasView() {
                     
                     <div style="display: flex; flex-direction: column; gap: 8px; min-width: 180px;">
                         <button onclick="imprimirListaSeccion()" class="btn-primary" style="background: #475569; width: 100%; height: 35px; font-size: 0.75rem; padding: 0 10px;">
-                            <i class="material-icons" style="font-size: 16px;">print</i> IMPRIMIR LISTA
+                            <i class="material-icons" style="font-size: 16px;">print</i> IMPRIMIR REGISTRO
                         </button>
                         <button onclick="imprimirNominaSeccion()" class="btn-primary" style="background: #1e293b; width: 100%; height: 35px; font-size: 0.75rem; padding: 0 10px;">
                             <i class="material-icons" style="font-size: 16px;">assignment</i> IMPRIMIR NÓMINA
@@ -7905,4 +7905,5 @@ function descargarPDFDesdeHistorial(index) {
 
     // La función descargarTicketPDF ya tiene la lógica de altura scrollHeight + colchón
     descargarTicketPDF(datosParaPDF, item.nroRecibo);
+
 }
