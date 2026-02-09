@@ -3394,21 +3394,31 @@ function renderDescuentosView() {
         return;
     }
 
+    const esAdminODirectivo = ['ADMINISTRADOR', 'DIRECTIVO'].includes(currentUser.role);
     const content = document.getElementById('content-area');
+
     content.innerHTML = `
         <style>
-            .desc-label { display: block; font-weight: 700; font-size: 0.95rem; color: #475569; margin-bottom: 8px; text-transform: uppercase; }
-            .desc-input { width: 100%; padding: 12px 16px; font-size: 1rem; border: 2px solid #e2e8f0; border-radius: 12px; color: #1e293b; margin-bottom: 20px; transition: 0.3s; }
+            .desc-label { display: block; font-weight: 700; font-size: 0.85rem; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+            .desc-input { width: 100%; padding: 10px 14px; font-size: 0.95rem; border: 2px solid #e2e8f0; border-radius: 10px; color: #1e293b; transition: 0.3s; }
             .desc-input:focus { border-color: #0ea5e9; outline: none; background: #f0f9ff; }
             .panel-desc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 25px; }
-            .item-est-busqueda { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; }
-            .item-est-busqueda:hover { background: #e0f2fe; }
+            
+            /* Navegación por Pestañas */
+            .tabs-container-desc { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+            .tab-btn { 
+                padding: 10px 22px; border: none; background: none; font-weight: 800; color: #64748b; 
+                cursor: pointer; border-radius: 8px; transition: 0.3s; font-size: 0.85rem;
+            }
+            .tab-btn.active { background: #0ea5e9; color: white; box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.3); }
+            .tab-content-desc { display: none; }
+            .tab-content-desc.active { display: block; animation: fadeIn 0.4s; }
         </style>
 
-        <div class="module-header animate__animated animate__fadeIn" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
+        <div class="module-header animate__animated animate__fadeIn" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
             <div>
                 <h2 style="color: #0369a1; font-weight: 900; font-size: 1.8rem; margin:0;">Gestión de Descuentos</h2>
-                <p style="color: #64748b;">Asigne beneficios económicos a estudiantes matriculados.</p>
+                <p style="color: #64748b;">Asigne beneficios y visualice el historial de descuentos aplicados.</p>
             </div>
             <div class="anio-indicador" style="padding: 8px 20px; border-radius: 30px; background: #0369a1; color: white;">
                 <i class="material-icons" style="vertical-align: middle; font-size: 1.2rem;">event_available</i>
@@ -3416,80 +3426,372 @@ function renderDescuentosView() {
             </div>
         </div>
 
-        <div class="animate__animated animate__fadeInUp" style="width: 100%; display: grid; grid-template-columns: 1.2fr 1fr; gap: 25px;">
-            
-            <div class="panel-desc">
-                <h3 style="color: #0369a1; font-size: 1.3rem; font-weight: 900; margin-bottom: 20px; border-bottom: 3px solid #0ea5e9; padding-bottom: 8px; display: inline-block;">
-                    1. ESTUDIANTE Y MONTO
-                </h3>
+        <div class="tabs-container-desc">
+            <button class="tab-btn active" onclick="cambiarTabDescuento('registro', this)">REGISTRAR DESCUENTO</button>
+            ${esAdminODirectivo ? `<button class="tab-btn" onclick="cambiarTabDescuento('reporte', this)">VER DESCUENTOS</button>` : ''}
+        </div>
 
-                <div style="background: white; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; margin-bottom: 20px; position: relative;"> <label class="desc-label">Buscar Estudiante (DNI o Nombre)</label>
-                    <input type="text" id="desc-busqueda" class="desc-input" placeholder="Escriba para buscar..." onkeyup="filtrarEstudiantesDescuento()">
-                    
-                    <div id="resultados-busqueda-desc" 
-                        style="max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; 
-                                display: none; position: absolute; width: calc(100% - 40px); z-index: 100; 
-                                background: white; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
-                    </div>
-                    
-                    <div id="estudiante-seleccionado-info" style="margin-top: 15px; display: none; background: #f0f9ff; padding: 15px; border-radius: 15px; border-left: 5px solid #0ea5e9;">
-                        <div style="font-weight: 800; color: #0369a1;" id="desc-est-nombre">---</div>
-                        <div style="font-size: 0.85rem; color: #64748b;" id="desc-est-dni">DNI: ---</div>
+        <div id="tab-desc-registro" class="tab-content-desc active">
+            <div class="animate__animated animate__fadeInUp" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 25px;">
+                <div class="panel-desc">
+                    <h3 style="color: #0369a1; font-size: 1.1rem; font-weight: 900; margin-bottom: 15px; border-bottom: 3px solid #0ea5e9; padding-bottom: 5px; display: inline-block;">1. ESTUDIANTE Y MONTO</h3>
+                    <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 15px; position: relative;">
+                        <label class="desc-label">Buscar Estudiante</label>
+                        <input type="text" id="desc-busqueda" class="desc-input" placeholder="Escriba DNI o Apellidos..." onkeyup="filtrarEstudiantesDescuento()">
+                        <div id="resultados-busqueda-desc" style="display: none;"></div>
                         
-                        <div id="historial-estudiante-desc" style="margin-top: 15px; border-top: 1px solid #bae6fd; padding-top: 10px;">
-                            <div style="font-weight: 700; font-size: 0.8rem; color: #0369a1; margin-bottom: 5px;">HISTORIAL DE DESCUENTOS (AÑO ACTUAL)</div>
-                            <div id="lista-historial-vacia" style="font-size: 0.8rem; color: #94a3b8;">Sin descuentos previos.</div>
-                            <div id="tabla-historial-desc" style="display:none;">
-                                </div>
+                        <div id="estudiante-seleccionado-info" style="margin-top: 15px; display: none; background: #f0f9ff; padding: 15px; border-radius: 12px; border-left: 5px solid #0ea5e9;">
+                            <div style="font-weight: 800; color: #0369a1;" id="desc-est-nombre">---</div>
+                            <div style="font-size: 0.85rem; color: #64748b;" id="desc-est-dni">DNI: ---</div>
+                            <div id="historial-estudiante-desc" style="margin-top: 10px; border-top: 1px solid #bae6fd; padding-top: 10px;">
+                                <div id="lista-historial-vacia" style="font-size: 0.8rem; color: #94a3b8;">Sin descuentos previos.</div>
+                                <div id="tabla-historial-desc" style="display:none;"></div>
+                            </div>
                         </div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <label class="desc-label">Monto Descuento (S/)</label>
+                        <input type="number" id="desc-monto" class="desc-input" placeholder="0.00" style="font-weight: 800; color: #dc2626;">
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px;">
+                        <label class="desc-label">Observación (Opcional)</label>
+                        <textarea id="desc-obs" class="desc-input" rows="2" placeholder="Motivo del descuento..."></textarea>
                     </div>
                 </div>
 
-                <div style="background: white; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label class="desc-label">Monto Descuento (S/)</label>
-                            <input type="number" id="desc-monto" class="desc-input" placeholder="0.00" style="font-weight: 800; color: #dc2626;">
-                        </div>
-                        <div>
-                            <label class="desc-label">Observación (Opcional)</label>
-                            <input type="text" id="desc-obs" class="desc-input" placeholder="Motivo...">
-                        </div>
+                <div class="panel-desc">
+                    <h3 style="color: #0369a1; font-size: 1.1rem; font-weight: 900; margin-bottom: 15px; border-bottom: 3px solid #0ea5e9; padding-bottom: 5px; display: inline-block;">2. CONCEPTOS</h3>
+                    <div id="contenedor-conceptos-desc" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; height: 280px; overflow-y: auto;">
+                        <p style="text-align:center; color:#94a3b8; margin-top:100px;">Seleccione un estudiante.</p>
                     </div>
-                </div>
-            </div>
-
-            <div class="panel-desc">
-                <h3 style="color: #0369a1; font-size: 1.3rem; font-weight: 900; margin-bottom: 20px; border-bottom: 3px solid #0ea5e9; padding-bottom: 8px; display: inline-block;">
-                    2. CONCEPTOS A APLICAR
-                </h3>
-                
-                <div id="contenedor-conceptos-desc" style="background: white; border: 1px solid #e2e8f0; border-radius: 15px; padding: 20px; height: 320px; overflow-y: auto;">
-                    <div style="text-align: center; margin-top: 100px; color: #94a3b8;">
-                        <p>Seleccione un estudiante para ver los conceptos de su sección.</p>
-                    </div>
-                </div>
-
-                <div style="margin-top: 25px; display: flex; justify-content: flex-end;">
-                    <button id="btn-save-desc" class="btn-matricula-especial" onclick="procesarGuardadoDescuento()" style="width: auto; padding: 14px 50px; font-weight: 800;">
-                        <i class="material-icons" style="margin-right:10px;">check_circle</i> REGISTRAR DESCUENTO
-                    </button>
+                    <button id="btn-save-desc" class="btn-matricula-especial" onclick="procesarGuardadoDescuento()" style="margin-top: 20px; width: 100%;">REGISTRAR DESCUENTO</button>
                 </div>
             </div>
         </div>
+
+        ${esAdminODirectivo ? `
+        <div id="tab-desc-reporte" class="tab-content-desc">
+            <div class="panel-desc">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr auto; gap: 15px; align-items: flex-end;">
+                    <div><label class="desc-label">Nivel</label><select id="rep-desc-nivel" class="desc-input" onchange="actualizarFiltrosReporteDesc('nivel')"></select></div>
+                    <div><label class="desc-label">Grado</label><select id="rep-desc-grado" class="desc-input" onchange="actualizarFiltrosReporteDesc('grado')"></select></div>
+                    <div><label class="desc-label">Sección</label><select id="rep-desc-seccion" class="desc-input" onchange="actualizarFiltrosReporteDesc('seccion')"></select></div>
+                    <div><label class="desc-label">Concepto</label><select id="rep-desc-concepto" class="desc-input"></select></div>
+                    <button class="btn-primary" onclick="consultarReporteDescuentos()" style="height: 42px; padding: 0 20px;">
+                        <i class="material-icons">search</i>
+                    </button>
+                </div>
+
+                <div class="table-container" style="margin-top: 25px; background: white; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <table class="data-table">
+                        <thead style="background: #f8fafc;">
+                            <tr>
+                                <th style="width: 100px;">FECHA</th>
+                                <th>ID</th>
+                                <th>ESTUDIANTE / SECCIÓN</th>
+                                <th>CONCEPTO</th>
+                                <th>REGISTRADO POR</th>
+                                <th style="text-align: right; width: 100px;">MONTO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="body-reporte-descuentos">
+                            <tr><td colspan="6" style="text-align:center; padding: 30px; color: #94a3b8;">Utilice los filtros superiores para visualizar los descuentos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        ` : ''}
     `;
     inicializarDescuentos();
 }
 
+function cambiarTabDescuento(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('.tab-content-desc').forEach(c => c.classList.remove('active'));
+    if (tab === 'registro') {
+        document.getElementById('tab-desc-registro').classList.add('active');
+    } else {
+        document.getElementById('tab-desc-reporte').classList.add('active');
+        // Llamada para poblar los filtros por primera vez
+        prepararFiltrosReporteDesc();
+    }
+}
+
+
+
+/**
+ * 1. PREPARACIÓN DE FILTROS (Al entrar a la pestaña Reporte)
+ */
+async function prepararFiltrosReporteDesc() {
+    console.log("🔍 Preparando filtros del reporte...");
+    
+    if (!dataConsultasGlobal || !dataConsultasGlobal.secciones) {
+        await preCargarDataConsultas();
+    }
+
+    // Asegurar que tenemos el ID del año (prioridad global, luego local)
+    const anioID = String(anioActivoID || (datosDescuentosLocal.anio ? datosDescuentosLocal.anio.id : "")).trim();
+
+    const selNivel = document.getElementById('rep-desc-nivel');
+    const selGrado = document.getElementById('rep-desc-grado');
+    const selSeccion = document.getElementById('rep-desc-seccion');
+    const selConcepto = document.getElementById('rep-desc-concepto');
+
+    if (selNivel && dataConsultasGlobal.secciones) {
+        // Obtenemos niveles únicos (Normalizamos a Mayúsculas para comparar)
+        const niveles = [...new Set(dataConsultasGlobal.secciones
+            .filter(s => String(s.idAnio || s.id_anio || "").trim() === anioID)
+            .map(s => String(s.nivel || s.Nivel || "").trim().toUpperCase()))]
+            .filter(n => n !== ""); 
+
+        selNivel.innerHTML = '<option value="">-- SELECCIONE NIVEL --</option>' + 
+            niveles.map(n => `<option value="${n}">${n}</option>`).join('');
+    }
+
+    // Resetear hijos
+    if (selGrado) selGrado.innerHTML = '<option value="">--</option>';
+    if (selSeccion) selSeccion.innerHTML = '<option value="">--</option>';
+    if (selConcepto) selConcepto.innerHTML = '<option value="">--</option>';
+}
+
+/**
+ * 2. CASCADA DE FILTROS (Nivel -> Grado -> Sección -> Concepto)
+ */
+function actualizarFiltrosReporteDesc(tipo) {
+    const dataGlobal = dataConsultasGlobal;
+    const dataLocal = datosDescuentosLocal;
+    if (!dataGlobal || !dataGlobal.secciones) return;
+
+    const selNivel = document.getElementById('rep-desc-nivel');
+    const selGrado = document.getElementById('rep-desc-grado');
+    const selSeccion = document.getElementById('rep-desc-seccion');
+    const selConcepto = document.getElementById('rep-desc-concepto');
+
+    const anioIDBusqueda = String(anioActivoID || "").trim().toUpperCase();
+    const nivelSeleccionado = String(selNivel.value || "").trim().toUpperCase();
+    const gradoSeleccionado = String(selGrado.value || "").trim().toUpperCase();
+
+    // 1. DEFINICIÓN DEL ORDEN ACADÉMICO
+    const ORDEN_ACADEMICO = [
+        "PRIMERO", "SEGUNDO", "TERCERO", "CUARTO", "QUINTO", "SEXTO"
+    ];
+
+    if (tipo === 'nivel') {
+        if (!nivelSeleccionado) {
+            selGrado.innerHTML = '<option value="">--</option>';
+            return;
+        }
+
+        // Obtener y normalizar grados
+        let grados = [...new Set(dataGlobal.secciones
+            .filter(s => {
+                const sAnio = String(s.idAnio || s.id_anio || "").trim().toUpperCase();
+                const sNivel = String(s.nivel || s.Nivel || "").trim().toUpperCase();
+                return sAnio === anioIDBusqueda && sNivel === nivelSeleccionado;
+            })
+            .map(s => String(s.grado || s.Grado || "").trim().toUpperCase()))]
+            .filter(g => g !== "");
+
+        // 2. LÓGICA DE ORDENAMIENTO PERSONALIZADO
+        grados.sort((a, b) => {
+            let indexA = ORDEN_ACADEMICO.indexOf(a);
+            let indexB = ORDEN_ACADEMICO.indexOf(b);
+            
+            // Si el grado no está en nuestra lista de referencia, lo mandamos al final
+            if (indexA === -1) indexA = 99;
+            if (indexB === -1) indexB = 99;
+            
+            return indexA - indexB;
+        });
+
+        selGrado.innerHTML = '<option value="">-- SELECCIONE GRADO --</option>' + 
+            grados.map(g => `<option value="${g}">${g}</option>`).join('');
+        
+        selSeccion.innerHTML = '<option value="">--</option>';
+        selConcepto.innerHTML = '<option value="">--</option>';
+    }
+    
+    else if (tipo === 'grado') {
+        if (!gradoSeleccionado) return;
+
+        // FILTRADO DE SECCIONES CON NORMALIZACIÓN
+        const secciones = dataGlobal.secciones.filter(s => {
+            const sAnio = String(s.idAnio || s.id_anio || "").trim().toUpperCase();
+            const sNivel = String(s.nivel || s.Nivel || "").trim().toUpperCase();
+            const sGrado = String(s.grado || s.Grado || "").trim().toUpperCase();
+            return sAnio === anioIDBusqueda && sNivel === nivelSeleccionado && sGrado === gradoSeleccionado;
+        });
+
+        console.log("🏫 Secciones detectadas:", secciones.length);
+
+        selSeccion.innerHTML = '<option value="">-- SELECCIONE SECCIÓN --</option>' + 
+            secciones.map(s => `<option value="${s.id}">${String(s.nombre || s.Nombre || "").toUpperCase()}</option>`).join('');
+        
+        selConcepto.innerHTML = '<option value="">--</option>';
+    }
+
+    else if (tipo === 'seccion') {
+        const idSecSeleccionada = String(selSeccion.value).trim();
+        const listaConceptosGlobal = datosDescuentosLocal.conceptos || [];
+
+        console.log("🔍 Buscando en lista de conceptos:", listaConceptosGlobal.length);
+
+        if (!idSecSeleccionada || idSecSeleccionada === "" || idSecSeleccionada === "--") {
+            selConcepto.innerHTML = '<option value="">--</option>';
+            return;
+        }
+
+        const conceptos = listaConceptosGlobal.filter(c => {
+            // Convertimos la lista de IDs de la columna I en un array limpio
+            const idsPermitidos = String(c.idsSecciones || "").split(',').map(s => s.trim());
+            return idsPermitidos.includes(idSecSeleccionada);
+        });
+
+        console.log("💰 Conceptos finales encontrados:", conceptos.length);
+
+        if (conceptos.length > 0) {
+            selConcepto.innerHTML = '<option value="">TODOS LOS CONCEPTOS</option>' + 
+                conceptos.map(c => `<option value="${c.id}">${String(c.nombre).toUpperCase()}</option>`).join('');
+        } else {
+            selConcepto.innerHTML = '<option value="">SIN CONCEPTOS DISPONIBLES</option>';
+        }
+    }
+}
+
+//----------------------------------------------
+
+/*
+async function consultarReporteDescuentos() {
+    const tbody = document.getElementById('body-reporte-descuentos');
+    
+    // Verificamos que tengamos el ID del año antes de pedir nada
+    const idAnio = anioActivoID || (datosDescuentosLocal.anio ? datosDescuentosLocal.anio.id : "");
+    
+    if (!idAnio) {
+        lanzarNotificacion('error', 'SISTEMA', 'No se ha detectado el año académico activo.');
+        return;
+    }
+
+    const filtros = {
+        idAnio: idAnio,
+        nivel: document.getElementById('rep-desc-nivel').value,
+        grado: document.getElementById('rep-desc-grado').value,
+        idSec: document.getElementById('rep-desc-seccion').value,
+        idCon: document.getElementById('rep-desc-concepto').value
+    };
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Consultando servidor...</td></tr>';
+
+    try {
+        const res = await sendRequest('get_reporte_descuentos', filtros);
+        console.log("Respuesta del servidor:", res);
+        
+        if (res.status === 'success') {
+            // ... resto del código para pintar la tabla ...
+            if (res.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos para mostrar.</td></tr>';
+            } else {
+                tbody.innerHTML = res.data.map(d => `
+                    <tr>
+                        <td>${new Date(d.fecha).toLocaleDateString()}</td>
+                        <td>${d.idEst}</td>
+                        <td>${d.estudiante}</td>
+                        <td>${d.concepto}</td>
+                        <td>${d.usuario}</td>
+                        <td style="text-align:right;">S/ ${parseFloat(d.monto).toFixed(2)}</td>
+                    </tr>`).join('');
+            }
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">${res.message}</td></tr>`;
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Fallo de red o CORS.</td></tr>';
+    }
+}
+*/
+
+function consultarReporteDescuentos() {
+    const tbody = document.getElementById('body-reporte-descuentos');
+    if (!tbody || !datosDescuentosLocal.descuentos) return;
+
+    // 1. CAPTURAR FILTROS
+    const fNivel = document.getElementById('rep-desc-nivel').value;
+    const fGrado = document.getElementById('rep-desc-grado').value;
+    const fSec = document.getElementById('rep-desc-seccion').value;
+    const fCon = document.getElementById('rep-desc-concepto').value;
+
+    // 2. FILTRAR EN MEMORIA (Velocidad de microsegundos)
+    const filtrados = datosDescuentosLocal.descuentos.filter(d => {
+        // Filtro Sección (Si se elige sección, es el más específico)
+        if (fSec && d.idSec !== fSec) return false;
+        
+        // Filtro Concepto
+        if (fCon && d.idCon !== fCon) return false;
+
+        // Filtros de Nivel/Grado (Si no se eligió sección específica)
+        if (!fSec && fNivel) {
+            if (!d.seccionDetalle.includes(`(${fNivel})`)) return false;
+        }
+        if (!fSec && fGrado) {
+            if (!d.seccionDetalle.startsWith(fGrado)) return false;
+        }
+
+        return true;
+    });
+
+    // 3. RENDERIZAR
+    if (filtrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No se encontraron registros.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtrados.map(d => `
+        <tr class="animate__animated animate__fadeIn">
+            <td style="font-size:0.8rem;">${d.fecha ? new Date(d.fecha).toLocaleDateString() : '---'}</td>
+            <td style="font-family:monospace; font-weight:700; color:#0369a1;">${d.idEst}</td>
+            <td>
+                <div style="font-weight:800; font-size:0.9rem;">${d.estudiante}</div>
+                <div style="font-size:0.7rem; color:#0ea5e9; font-weight:700;">${d.seccionDetalle}</div>
+            </td>
+            <td style="font-weight:700; color:#475569;">${d.nombreConcepto.toUpperCase()}</td>
+            <td style="font-size:0.8rem;">${d.usuario}</td>
+            <td style="text-align:right;">
+                <span style="background:#fee2e2; color:#dc2626; padding:4px 10px; border-radius:6px; font-weight:900;">
+                    S/ ${parseFloat(d.monto || 0).toFixed(2)}
+                </span>
+            </td>
+        </tr>`).join('');
+}
+
+
+
+
+//========================================
+
 async function inicializarDescuentos() {
     try {
         const res = await sendRequest('get_datos_descuentos');
+        console.log("📥 Datos Descuentos Recibidos:", res); // DIAGNÓSTICO
+
         if (res.status === 'success') {
             datosDescuentosLocal = res;
+            // Aseguramos que la variable global de año se actualice
             anioActivoID = res.anio.id;
-            document.getElementById('desc-anio-texto').innerText = `AÑO: ${res.anio.nombre}`;
+            
+            const txtAnio = document.getElementById('desc-anio-texto');
+            if (txtAnio) txtAnio.innerText = `AÑO: ${res.anio.nombre}`;
+            
+            console.log(`✅ Memoria cargada: ${res.estudiantes.length} alumnos y ${res.conceptos.length} conceptos.`);
+        } else {
+            lanzarNotificacion('error', 'SISTEMA', res.message);
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Error al inicializar descuentos:", e); 
+    }
 }
 
 function filtrarEstudiantesDescuento() {
@@ -3499,40 +3801,43 @@ function filtrarEstudiantesDescuento() {
     if (!inputBusqueda || !listaResultados) return;
 
     const buscado = inputBusqueda.value.toLowerCase().trim();
-    
-    // Si la búsqueda es muy corta, ocultamos la lista
     if (buscado.length < 2) { 
         listaResultados.style.display = 'none'; 
         return; 
     }
 
-    // Filtrado robusto (Nombre y DNI)
-    const filtrados = datosDescuentosLocal.estudiantes.filter(e => {
-        const nombreMatch = String(e.nombre).toLowerCase().includes(buscado);
-        const dniMatch = String(e.dni).includes(buscado);
-        return nombreMatch || dniMatch;
+    // Buscamos en la memoria local cargada
+    const listaAlumnos = datosDescuentosLocal.estudiantes || [];
+    const filtrados = listaAlumnos.filter(e => {
+        const nom = String(e.nombre || "").toLowerCase();
+        const dni = String(e.dni || "");
+        return nom.includes(buscado) || dni.includes(buscado);
     });
 
     if (filtrados.length > 0) {
-        listaResultados.innerHTML = filtrados.map((e, index) => `
+        listaResultados.innerHTML = filtrados.map(e => `
             <div class="item-est-busqueda" 
-                 onclick="seleccionarEstudianteDescByIndex(${index}, '${e.idEst}')"
+                 onclick="seleccionarEstudianteDescPorID('${e.idEst}')"
                  style="padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer;">
                 <div style="font-weight: 700; color: #1e293b;">${e.nombre}</div>
                 <div style="font-size: 0.8rem; color: #64748b;">DNI: ${e.dni}</div>
             </div>
         `).join('');
         listaResultados.style.display = 'block';
-        // Ajuste de estilo para que flote sobre el resto
-        listaResultados.style.position = 'absolute';
-        listaResultados.style.zIndex = '100';
-        listaResultados.style.width = '100%';
-        listaResultados.style.background = 'white';
-        listaResultados.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
     } else {
-        listaResultados.innerHTML = '<div class="p-3 text-muted">No se encontraron estudiantes activos.</div>';
+        listaResultados.innerHTML = '<div style="padding:15px; color:#94a3b8;">No se encontraron resultados.</div>';
         listaResultados.style.display = 'block';
     }
+}
+
+// Nueva función de selección simplificada
+function seleccionarEstudianteDescPorID(idEst) {
+    const est = (datosDescuentosLocal.estudiantes || []).find(e => String(e.idEst) === String(idEst));
+    if (est) {
+        // Reutilizamos la lógica que ya tienes pero pasando el objeto correcto
+        seleccionarEstudianteDescByIndex(0, est.idEst); 
+    }
+    document.getElementById('resultados-busqueda-desc').style.display = 'none';
 }
 
 function seleccionarEstudianteDesc(est) {
@@ -3566,6 +3871,7 @@ function seleccionarEstudianteDesc(est) {
     }
 }
 
+/*
 async function procesarGuardadoDescuento() {
     const btn = document.getElementById('btn-save-desc');
     // Obtenemos los IDs de los conceptos marcados
@@ -3615,6 +3921,56 @@ async function procesarGuardadoDescuento() {
             btn.innerHTML = originalHTML;
             btn.disabled = false;
         }
+    }
+}
+*/
+
+async function procesarGuardadoDescuento() {
+    const btn = document.getElementById('btn-save-desc');
+    const elMonto = document.getElementById('desc-monto');
+    const elObs = document.getElementById('desc-obs'); // Ahora ya existe
+
+    // Obtenemos los IDs de los conceptos marcados
+    const seleccionados = Array.from(document.querySelectorAll('input[name="desc-con-check"]:checked')).map(cb => cb.value);
+    
+    const monto = elMonto ? elMonto.value : null;
+    const observation = elObs ? elObs.value : ""; // Validación de nulidad
+
+    if (!estudianteElegidoDesc || seleccionados.length === 0 || !monto) {
+        return lanzarNotificacion('error', 'FALTAN DATOS', 'Seleccione estudiante, conceptos y monto.');
+    }
+
+    // ... resto de tu lógica de bloqueo de botón ...
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="material-icons rotate">sync</i> REGISTRANDO...';
+    btn.disabled = true;
+
+    try {
+        const res = await sendRequest('save_descuentos_estudiante', {
+            idEst: estudianteElegidoDesc.idEst,
+            idAnio: anioActivoID,
+            monto: monto,
+            conceptosIds: seleccionados,
+            obs: observation 
+        });
+
+        if (res.status === 'success') {
+            lanzarNotificacion('success', 'ÉXITO', res.message);
+            
+            // Si tienes la función de sincronización con caja, llámala aquí
+            if (typeof sincronizarDescuentoEnCaja === 'function') {
+                sincronizarDescuentoEnCaja(estudianteElegidoDesc.idEst, seleccionados, monto);
+            }
+
+            estudianteElegidoDesc = null;
+            renderDescuentosView(); // Esto limpia todo el formulario automáticamente
+        } else {
+            lanzarNotificacion('error', 'SISTEMA', res.message);
+        }
+    } catch (e) {
+        lanzarNotificacion('error', 'CONEXIÓN', 'Error de red.');
+    } finally {
+        if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
     }
 }
 
@@ -5372,7 +5728,9 @@ function cerrarModalFuera(event) {
 }
 
 
-/*-----------------------------------------------------------------------*/
+
+
+/*=========================================================================*/
 // --- MÓDULO DE EGRESOS ---
 
 function renderEgresosView() {
